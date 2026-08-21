@@ -1,0 +1,12 @@
+# 模型文件（约 43GB，运行 scripts/download_models.sh 生成）
+models/
+
+# 生成输出
+output/
+
+# 本地环境变量（含密码）
+.env
+
+# 系统文件
+.DS_Store
+*.log

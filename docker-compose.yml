@@ -1,0 +1,36 @@
+# ComfyUI + MiniMax H3 一键部署（docker compose）
+# 前提：NVIDIA GPU + nvidia-container-toolkit（docker run --gpus all 可用）
+#
+# 用法：
+#   cp .env.example .env   # 修改 WEB_PASSWORD 等
+#   ./scripts/download_models.sh   # 下载模型（约 43GB）
+#   docker compose up -d --build
+#   # WebUI: http://localhost:8188  （账号 user / 密码见 .env）
+services:
+  comfyui:
+    build: .
+    image: comfy-h3-container:latest
+    container_name: comfyui-h3
+    restart: unless-stopped
+    # NVIDIA GPU 透传（等价 docker run --gpus all）
+    gpus: all
+    ports:
+      - "8188:8188"
+    environment:
+      # 修改密码：在 .env 中设置 WEB_PASSWORD
+      WEB_PASSWORD: ${WEB_PASSWORD:-comfy-h3}
+      # 容器内 ComfyUI 监听端口（必须与 COMFYUI_PORT_HOST 不同，避免与 caddy 冲突）
+      COMFYUI_PORT_LOCAL: "18188"
+      COMFYUI_PORT_HOST: "8188"
+      # --lowvram：按需加载/卸载，12GB 显卡实测关键参数
+      COMFYUI_ARGS: "--listen 0.0.0.0 --lowvram"
+    volumes:
+      # 模型文件（先运行 scripts/download_models.sh 填充）
+      - ./models:/workspace/models
+      # 生成结果持久化
+      - ./output:/opt/ComfyUI/output
+    # 可选：限制资源
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 64G
