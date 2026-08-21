@@ -4,16 +4,16 @@
 
 本项目封装了完整可复现的部署链路：容器镜像定制（含所有踩坑修复）、模型下载脚本、`--lowvram` 低显存优化、Turbo 4 步加速，实测 **512×288 / 4.46s 视频约 136 秒出片**（RTX 3060 12GB）。
 
-## ✨ 特性
+## 特性
 
-- ✅ Docker 容器化，一条命令启动（`docker compose up -d`）
-- ✅ 原生支持 MiniMax H3（T2V / I2V / R2V，视频 + 32kHz 立体声音频同步生成）
-- ✅ 12GB 显存实测可跑（int8 量化 + `--lowvram` + CPU offload）
-- ✅ Turbo 4 步 LoRA + EasyCache 加速（实测提速 ~4.4×）
-- ✅ WebUI + REST API（ComfyUI 原生）
-- ✅ 模型一键下载脚本（断点续传）
+- Docker 容器化，一条命令启动（`docker compose up -d`）
+- 原生支持 MiniMax H3（T2V / I2V / R2V，视频 + 32kHz 立体声音频同步生成）
+- 12GB 显存实测可跑（int8 量化 + `--lowvram` + CPU offload）
+- Turbo 4 步 LoRA + EasyCache 加速（实测提速 ~4.4×）
+- WebUI + REST API（ComfyUI 原生）
+- 模型一键下载脚本（断点续传）
 
-## 📋 硬件要求
+## 硬件要求
 
 | 项目 | 最低 | 推荐 |
 |---|---|---|
@@ -24,7 +24,7 @@
 
 > 非 NVIDIA（AMD ROCm / Apple Silicon）请参考文末的社区方案。
 
-## 🚀 快速开始
+## 快速开始
 
 ```bash
 # 1. 克隆本项目
@@ -42,7 +42,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-启动完成后访问 **http://localhost:8188**（账号 `user`，密码为 `.env` 中的 `WEB_PASSWORD`）。
+启动完成后访问 http://localhost:8188（账号 `user`，密码为 `.env` 中的 `WEB_PASSWORD`）。
 
 ### 生成视频
 
@@ -58,7 +58,7 @@ docker compose up -d --build
 - 再接入 `EasyCache`（ComfyUI 内置节点，默认参数即可）
 - `BasicScheduler` 步数设为 **4**，sampler 用 `MiniMaxH3TurboSampler`
 
-## 🛠 配置说明
+## 配置说明
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
@@ -88,14 +88,14 @@ models/
 
 更高分辨率（1344×768 原生画布 / 5s）参考社区实测约 7 分钟/段（Turbo 4 步 + EasyCache）。
 
-## ⚠️ 已知限制
+## 已知限制
 
 1. 12GB 显存为"能跑但慢"的降级配置：权重（~37GB）无法全部驻留显存，推理时 CPU offload，速度受 PCIe 带宽限制
 2. v4-600 Turbo LoRA 在 **4 步 + 大幅快速运动**场景偶有 motion-smear，遇到可改用 6-8 步（仍快于官方 20 步）
 3. 完整 H3 系统（H3-Context-IR / 2K 再生）为云端 API，未开源；本方案为本地 H3-Base（768p 档）
 4. 模型权重遵循 MiniMax H3 社区许可（注意地区限制：排除美/欧/英/韩）
 
-## 📚 参考项目与致谢
+## 参考项目与致谢
 
 本项目为以下开源项目的整合与容器化封装，**衷心感谢**各项目作者：
 
@@ -111,13 +111,7 @@ models/
 | [Saganaki22/ComfyUI-sol-attn](https://github.com/Saganaki22/ComfyUI-sol-attn) | （可选）Sol-Attn 无损加速，支持 SM86（RTX 30 系） |
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |
 
-## 🔗 其他平台方案
-
-- **Apple Silicon（MLX）**：[PipeNetwork/minimax-h3-mlx](https://github.com/PipeNetwork/minimax-h3-mlx)、[mrbizarro/Phosphene](https://github.com/mrbizarro/Phosphene)（48GB 内存机型参考 [AlexeyKorzhebin/minimax-h3-mlx-48gb](https://github.com/AlexeyKorzhebin/minimax-h3-mlx-48gb)）
-- **Mac（非 MLX）**：[antirez/h3.c](https://github.com/antirez/h3.c)
-- **云端 API**：MiniMax 官方平台（H3-Context-IR + 2K 再生完整链路，需 API token）
-
-## 📄 License
+## License
 
 - 本仓库部署脚本/配置：Apache-2.0
 - ComfyUI / ai-dock / 各插件：遵循其各自开源许可证
