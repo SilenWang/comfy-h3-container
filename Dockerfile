@@ -42,13 +42,28 @@ RUN git clone --depth 1 \
 #            sqlalchemy>=1.4,<2.0 与 fastmcp/openai-agents 的依赖间反复回溯，
 #            最后尝试源码编译远古 greenlet（<0.4.17 的 setup.py 在 py3.10 下
 #            语法错误）而失败。升级到新版 pip 后一次解析成功。
+#    注意 4：Copilot 的 requirements 把 SQLAlchemy 限在 <2.0，会覆盖 ComfyUI
+#            自己要求的 >=2.0，导致 ComfyUI 启动时报
+#            "cannot import name '_NoneName' from 'sqlalchemy.sql.base'"。
+#            Copilot 只用到 create_engine/declarative_base/sessionmaker 等
+#            2.0 兼容 API，所以装完再把 SQLAlchemy 提到 >=2.0。
+#    注意 5：Copilot 运行时要往自己目录写 logs/，而 custom_nodes 是 root 克隆的，
+#            ComfyUI 以非 root 运行会 PermissionError。这里按运行时 UID/GID
+#            数字 chown（ai-dock 的 user/ai-dock 账号是 entrypoint 运行时才建的，
+#            构建阶段按名字 chown 会报 invalid user）。
 # ---------------------------------------------------------------
-RUN git clone --depth 1 \
-        https://github.com/AIDC-AI/ComfyUI-Copilot \
-        /opt/ComfyUI/custom_nodes/ComfyUI-Copilot && \
+RUN CLONE_DIR=/opt/ComfyUI/custom_nodes/ComfyUI-Copilot; \
+    rm -rf "$CLONE_DIR"; \
+    for i in 1 2 3; do \
+        git clone --depth 1 https://github.com/AIDC-AI/ComfyUI-Copilot "$CLONE_DIR" && break; \
+        rm -rf "$CLONE_DIR"; echo "clone retry $i ..."; sleep 5; \
+    done; \
+    test -d "$CLONE_DIR"; \
     bash -c "source /opt/environments/python/comfyui/bin/activate && \
         pip install --no-cache-dir --upgrade pip && \
-        pip install --no-cache-dir -r /opt/ComfyUI/custom_nodes/ComfyUI-Copilot/requirements.txt"
+        pip install --no-cache-dir -r /opt/ComfyUI/custom_nodes/ComfyUI-Copilot/requirements.txt && \
+        pip install --no-cache-dir 'SQLAlchemy>=2.0.0'" && \
+    chown -R 1000:1111 "$CLONE_DIR"
 
 # ---------------------------------------------------------------
 # 5. 安装 Comfy MCP Local：官方 stdio MCP server（引擎是 comfy-cli）
