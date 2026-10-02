@@ -7,6 +7,12 @@ output/
 # 本地环境变量（含密码）
 .env
 
+# pixi 环境目录（pixi.lock 需要提交，以保证环境可复现）
+.pixi/
+
+# 后台构建的日志 / PID（scripts/build_image.sh 生成）
+.build/
+
 # 系统文件
 .DS_Store
 *.log

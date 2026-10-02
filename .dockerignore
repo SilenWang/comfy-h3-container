@@ -1,0 +1,10 @@
+# 构建上下文瘦身：这些都不该进镜像
+.git
+.gitignore
+.env
+.env.example
+.build/
+.pixi/
+models/
+output/
+*.log

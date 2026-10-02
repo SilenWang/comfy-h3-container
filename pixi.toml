@@ -1,0 +1,36 @@
+[workspace]
+name = "comfy-h3-container"
+version = "0.1.0"
+description = "ComfyUI + MiniMax H3 容器化部署：统一任务入口 + 宿主侧 Comfy MCP Local 环境"
+authors = ["SilenWang"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+# 依赖全部通过 pixi 管理（见 AGENTS.md 的 pixi-first 约束）。
+# 这里是「宿主侧」环境：用于在宿主机上直接跑官方 Comfy MCP Local
+# （容器内也装了同一套，推荐那种更省事的方式，见 README）。
+[dependencies]
+python = "3.11.*"
+
+[pypi-dependencies]
+# comfy-cli 是 comfy-mcp 的引擎（每个工具都 shell out 到 `comfy --json`）
+comfy-cli = ">=1.14.0"
+comfy-mcp = "*"
+
+[tasks]
+# ── Docker 部署 ──────────────────────────────────────────────────────────
+build = { cmd = "bash scripts/build_image.sh", description = "后台启动镜像构建（可断点续建，避免前台超时）" }
+build-status = { cmd = "bash scripts/build_status.sh", description = "查看后台构建状态与日志尾部" }
+build-logs = { cmd = "tail -f .build/build.log", description = "跟踪后台构建日志" }
+up = { cmd = "docker compose up -d", description = "启动 ComfyUI + H3 容器（镜像已构建）" }
+up-build = { cmd = "docker compose up -d --build", description = "前台构建并启动（适合快速增量构建）" }
+down = { cmd = "docker compose down", description = "停止并移除容器" }
+restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyUI 容器" }
+logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
+models = { cmd = "bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB）" }
+
+# ── Comfy MCP Local ─────────────────────────────────────────────────────
+# 推荐：容器内运行（免认证、免宿主 workspace），客户端配置见 mcp-config。
+mcp-config = { cmd = "bash scripts/mcp_client_config.sh", description = "打印 MCP 客户端配置片段（默认容器模式）" }
+# 备选：宿主侧运行。需要 comfy-cli 已有可用 workspace，见 README。
+mcp = { cmd = "comfy-mcp", description = "启动宿主侧 Comfy MCP Local（stdio server）" }
