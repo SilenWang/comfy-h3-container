@@ -56,9 +56,12 @@ RUN git clone --depth 1 \
 #    装在容器内，MCP 客户端用 `docker exec -i comfyui-h3 comfy-mcp` 调起，
 #    直接驱动容器内 ComfyUI，不经过 caddy 反代，因此与 WebUI 认证无关。
 #    COMFY_LOCAL_URL 见下方 ENV。
+#    注意：必须一并升级 typer。comfy-cli 只要求 typer>=0.12.5，而基础镜像里
+#          的旧 typer 与新版 click 不兼容，`comfy` 启动时会抛
+#          "Secondary flag is not valid for non-boolean flag"。升 typer 即可。
 # ---------------------------------------------------------------
 RUN bash -c "source /opt/environments/python/comfyui/bin/activate && \
-        pip install --no-cache-dir --upgrade pip && \
+        pip install --no-cache-dir --upgrade pip typer && \
         pip install --no-cache-dir 'comfy-cli>=1.14.0' 'comfy-mcp'" && \
     ln -sf /opt/environments/python/comfyui/bin/comfy /usr/local/bin/comfy && \
     ln -sf /opt/environments/python/comfyui/bin/comfy-mcp /usr/local/bin/comfy-mcp && \
