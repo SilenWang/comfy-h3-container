@@ -50,6 +50,20 @@ docker compose up -d --build
 
 > 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `mcp-config`。只用原生 `docker compose` 也完全可以。
 
+### 镜像构建耗时较长时怎么办（推荐用可续建的后台方式）
+
+首次构建要拉 torch cu126 + ComfyUI 依赖 + Copilot 依赖，可能超过一次性前台命令能跑完的时间。Docker 会把已完成的分层写进 BuildKit 缓存，所以拆成「后台启动 + 反复重跑」可以断点续建：
+
+```bash
+pixi run build          # 后台启动构建，立即返回；已在跑则直接提示
+pixi run build-status   # 查看是否还在跑 + 日志尾部
+pixi run build-logs     # 实时跟踪 .build/build.log
+pixi run up             # 构建完成后启动容器（镜像已就绪，不再重建）
+```
+
+即使进程被环境回收，缓存仍在，重跑 `pixi run build` 会自动从上次完成的分层继续，不会从头再来。只想快速增量构建时也可以直接 `pixi run up-build`。
+
+
 ### 生成视频
 
 1. WebUI 打开模板库（Template Library）→ Video → 选择 `MiniMax H3 Text to Video (T2V)` / `Image to Video (I2V)`

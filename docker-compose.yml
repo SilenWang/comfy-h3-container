@@ -4,7 +4,7 @@
 # 用法：
 #   cp .env.example .env           # 认证 / Copilot LLM 等配置（默认已关闭密码）
 #   ./scripts/download_models.sh   # 下载模型（约 43GB）
-#   docker compose up -d --build
+#   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
 # AI 辅助（镜像内已装好）：
