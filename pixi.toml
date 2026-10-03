@@ -28,6 +28,9 @@ down = { cmd = "docker compose down", description = "停止并移除容器" }
 restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyUI 容器" }
 logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
 models = { cmd = "bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB）" }
+models-bg = { cmd = "bash scripts/download_models_bg.sh", description = "后台下载模型（可断点续传，避免前台超时）" }
+models-status = { cmd = "bash scripts/models_status.sh", description = "查看后台模型下载进度" }
+models-logs = { cmd = "tail -f .build/models.log", description = "跟踪后台模型下载日志" }
 
 # ── Comfy MCP Local ─────────────────────────────────────────────────────
 # 推荐：容器内运行（免认证、免宿主 workspace），客户端配置见 mcp-config。

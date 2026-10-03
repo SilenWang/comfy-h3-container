@@ -41,6 +41,8 @@ cp .env.example .env
 
 # 3. 下载模型（约 43GB，支持断点续传）
 ./scripts/download_models.sh
+# 首次下载很慢（hf CDN 实测约 3–10MB/s，可能几小时），推荐改用后台方式：
+#   pixi run models-bg && pixi run models-status
 
 # 4. 构建并启动
 docker compose up -d --build
@@ -48,7 +50,20 @@ docker compose up -d --build
 
 启动完成后访问 http://localhost:8188。默认 `.env.example` 已关闭认证，**直接进入、无需输密码**；若 `WEB_ENABLE_AUTH=true`，则账号固定为 `user`、密码为 `.env` 中的 `WEB_PASSWORD`。
 
-> 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `mcp-config`。只用原生 `docker compose` 也完全可以。
+> 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `models-bg` / `mcp-config`。只用原生 `docker compose` 也完全可以。
+
+### 模型下载（可能几小时，支持断点续传）
+
+到 HuggingFace CDN 的连接不稳定（HTTP/2 偶发中断、限速），脚本已强制 HTTP/1.1、开启自动重试与断点续传。后台方式：
+
+```bash
+pixi run models-bg       # 后台启动下载，立即返回
+pixi run models-status   # 查看各文件已下载大小与日志尾部
+pixi run models-logs     # 实时跟踪 .build/models.log
+```
+
+脚本会按远端 `content-length` 校验完整性：中断后重跑 `pixi run models-bg` 会从断点接着下，**已下载但未完成的文件不会被误跳**。
+
 
 ### 镜像构建耗时较长时怎么办（推荐用可续建的后台方式）
 
