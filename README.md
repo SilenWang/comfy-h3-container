@@ -48,6 +48,8 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+> ⚠️ 挂载目录要提前以**你自己的用户**建好：`mkdir -p models output`。若目录不存在，`docker compose` 会以 root 创建，容器内以 uid 1000 运行的 ComfyUI 会写不进去，表现为 SaveVideo 报 `PermissionError: '/opt/ComfyUI/output/video'`，或模型列表为空。
+
 启动完成后访问 http://localhost:8188。默认 `.env.example` 已关闭认证，**直接进入、无需输密码**；若 `WEB_ENABLE_AUTH=true`，则账号固定为 `user`、密码为 `.env` 中的 `WEB_PASSWORD`。
 
 > 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `models-bg` / `mcp-config`。只用原生 `docker compose` 也完全可以。
