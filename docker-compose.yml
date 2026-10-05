@@ -51,6 +51,9 @@ services:
       - ${MODELS_DIR:-./models}:/workspace/models
       # 生成结果持久化（同样可用 OUTPUT_DIR 指定外部目录）
       - ${OUTPUT_DIR:-./output}:/opt/ComfyUI/output
+      # 用户工作流持久化：仓库内自带调好的 H3 T2V 模板，容器每次启动都在
+      # WebUI 的 Workflows 列表里；在 WebUI 里保存的工作流也会落到这里。
+      - ./workflows:/opt/ComfyUI/user/default/workflows
     # 可选：限制资源
     # deploy:
     #   resources:
