@@ -2,10 +2,14 @@
 # 前提：NVIDIA GPU + nvidia-container-toolkit（docker run --gpus all 可用）
 #
 # 用法：
-#   cp .env.example .env   # 修改 WEB_PASSWORD 等
+#   cp .env.example .env           # 认证 / Copilot LLM 等配置（默认已关闭密码）
 #   ./scripts/download_models.sh   # 下载模型（约 43GB）
-#   docker compose up -d --build
-#   # WebUI: http://localhost:8188  （账号 user / 密码见 .env）
+#   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
+#   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
+#
+# AI 辅助（镜像内已装好）：
+#   ComfyUI-Copilot  在 WebUI 侧栏，需在 .env 或面板里填一个 LLM
+#   Comfy MCP Local  客户端配置见 `pixi run mcp-config`（或 ./scripts/mcp_client_config.sh）
 services:
   comfyui:
     build: .
@@ -17,6 +21,12 @@ services:
     ports:
       - "8188:8188"
     environment:
+      # WebUI 认证：由 ai-dock 基础镜像内置的 caddy 反向代理提供，
+      # 不是 ComfyUI 自带功能，也非必须。局域网自用可在 .env 里关闭：
+      #   WEB_ENABLE_AUTH=false
+      # 关闭后免密码访问，宿主侧脚本 / MCP 调用也不必再带凭证。
+      # ⚠️ 关闭后任何能访问该端口的人都能使用，切勿在公网暴露的机器上关闭。
+      WEB_ENABLE_AUTH: ${WEB_ENABLE_AUTH:-true}
       # 修改密码：在 .env 中设置 WEB_PASSWORD
       WEB_PASSWORD: ${WEB_PASSWORD:-comfy-h3}
       # 容器内 ComfyUI 监听端口（必须与 COMFYUI_PORT_HOST 不同，避免与 caddy 冲突）
@@ -24,11 +34,23 @@ services:
       COMFYUI_PORT_HOST: "8188"
       # --lowvram：按需加载/卸载，12GB 显卡实测关键参数
       COMFYUI_ARGS: "--listen 0.0.0.0 --lowvram"
+      # ComfyUI-Copilot 的 LLM（可选；留空则启动后在 WebUI 侧栏 Settings 里填）
+      # OpenAI 兼容端点即可，例如 DeepSeek：CC_OPENAI_BASE_URL=https://api.deepseek.com/v1
+      CC_OPENAI_API_KEY: ${CC_OPENAI_API_KEY:-}
+      CC_OPENAI_BASE_URL: ${CC_OPENAI_BASE_URL:-}
+      # 工作流生成可用独立模型（可选，不填则复用上面的聊天模型）
+      WORKFLOW_LLM_API_KEY: ${WORKFLOW_LLM_API_KEY:-}
+      WORKFLOW_LLM_BASE_URL: ${WORKFLOW_LLM_BASE_URL:-}
+      WORKFLOW_LLM_MODEL: ${WORKFLOW_LLM_MODEL:-}
     volumes:
-      # 模型文件（先运行 scripts/download_models.sh 填充）
-      - ./models:/workspace/models
-      # 生成结果持久化
-      - ./output:/opt/ComfyUI/output
+      # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
+      # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：
+      #   MODELS_DIR=/data/ai-models/comfy-h3
+      # 目录需提前存在且当前用户可写（Docker 会以 root 创建不存在的 bind 源，
+      # 导致容器内 uid 1000 读不到/写不进）。model 目录一般只读即可，可加 :ro。
+      - ${MODELS_DIR:-./models}:/workspace/models
+      # 生成结果持久化（同样可用 OUTPUT_DIR 指定外部目录）
+      - ${OUTPUT_DIR:-./output}:/opt/ComfyUI/output
     # 可选：限制资源
     # deploy:
     #   resources:

@@ -8,18 +8,39 @@ set -euo pipefail
 BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
 BASE_LORA="https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora/resolve/main"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-MODELS="$HERE/models"
+# 模型目录：默认仓库内 ./models；可用 MODELS_DIR 指向外部目录（与 compose 一致）。
+# 相对路径按仓库根目录解析。
+MODELS="${MODELS_DIR:-$HERE/models}"
+[[ "$MODELS" == /* ]] || MODELS="$HERE/$MODELS"
 
 mkdir -p "$MODELS"/{diffusion_models,text_encoders,vae,loras}
 
 dl() {
   local url="$1" dest="$2"
+  # 远端文件大小（跟随 302 到最后 CDN，取最后一个 content-length）
+  local expected
+  expected="$(curl -fsIL --http1.1 --retry 5 --retry-all-errors "$url" 2>/dev/null \
+    | awk 'BEGIN{IGNORECASE=1} /^content-length:/{v=$2} END{gsub(/[^0-9]/,"",v); print v}')"
+
   if [ -s "$dest" ]; then
-    echo "SKIP (exists): $dest"
-    return
+    local have
+    have="$(stat -c %s "$dest")"
+    if [ -n "$expected" ] && [ "$have" -eq "$expected" ]; then
+      echo "SKIP (complete): $dest"
+      return
+    fi
+    echo "RESUME: $dest ($have/${expected:-?} bytes)"
   fi
+
   echo "=== downloading $dest ==="
-  curl -fL --retry 3 -C - -o "$dest" "$url"
+  # --http1.1：到 hf.co CDN 的 HTTP/2 连接不稳定（常见 stream CANCEL / SSL 错误），
+  #           强制 1.1 后实测稳定。
+  # -C -：断点续传；--retry*：掉线自动重试并接着下。
+  # --speed-limit/--speed-time：传输卡死（<1MB/s 持续 60s）时主动断开交给重试。
+  curl -fL --http1.1 \
+    --retry 100 --retry-delay 5 --retry-all-errors \
+    --connect-timeout 30 --speed-limit 1048576 --speed-time 60 \
+    -C - -o "$dest" "$url"
 }
 
 # 1. 主模型（FL2VA，int8 剪枝，20.97GB）— T2V / I2V / 首尾帧
