@@ -66,6 +66,27 @@ pixi run models-logs     # 实时跟踪 .build/models.log
 
 脚本会按远端 `content-length` 校验完整性：中断后重跑 `pixi run models-bg` 会从断点接着下，**已下载但未完成的文件不会被误跳**。
 
+### 用外部模型目录（避免每次重新下载）
+
+模型本来就存在挂载卷里，容器重建不会丢。默认落在仓库内的 `./models`；如果想多个项目 / 多台机器共用同一份模型（比如放在 NAS 或大盘上），把 `MODELS_DIR` 指向外部目录即可：
+
+```bash
+# .env
+MODELS_DIR=/data/ai-models/comfy-h3
+OUTPUT_DIR=/data/ai-output/comfy-h3      # 可选，同理
+```
+
+`docker-compose.yml` 用的是 `${MODELS_DIR:-./models}`，所以不设就是原来的 `./models`，设了就挂外部目录到容器内的 `/workspace/models`。下载脚本也认同一个变量，直接把模型下到外部盘：
+
+```bash
+MODELS_DIR=/data/ai-models/comfy-h3 pixi run models-bg
+```
+
+两个注意点（就是之前踩过的坑）：
+
+1. **目录要提前以你自己的用户建好**（`mkdir -p /data/ai-models/comfy-h3`）。目录不存在时 Docker 会以 root 创建 bind 源，容器内以 uid 1000 运行的 ComfyUI 会读不到 / 写不进。
+2. 只读共享盘可以把它挂成只读，在 compose 里写 `"${MODELS_DIR}:/workspace/models:ro"`；下载仍在宿主侧写这个目录，不受影响。
+
 
 ### 镜像构建耗时较长时怎么办（推荐用可续建的后台方式）
 

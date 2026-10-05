@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG="$ROOT/.build/models.log"
 PIDF="$ROOT/.build/models.pid"
+# 与 compose / download_models.sh 一致的模型目录（默认 ./models，可 MODELS_DIR 覆盖）
+MODELS="${MODELS_DIR:-$ROOT/models}"
+[[ "$MODELS" == /* ]] || MODELS="$ROOT/$MODELS"
 
 if [[ -f "$PIDF" ]] && kill -0 "$(cat "$PIDF")" 2>/dev/null; then
   echo "状态：RUNNING（PID $(cat "$PIDF")）"
@@ -12,9 +15,9 @@ else
   echo "状态：未在运行"
 fi
 
-echo "--- 各文件已下载大小 ---"
+echo "--- 模型目录：$MODELS ---"
 shopt -s nullglob
-for f in "$ROOT"/models/*/*.safetensors; do
+for f in "$MODELS"/*/*.safetensors; do
   printf '%10s  %s\n' "$(du -h "$f" | cut -f1)" "$(basename "$f")"
 done
 shopt -u nullglob

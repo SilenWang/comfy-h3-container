@@ -43,10 +43,14 @@ services:
       WORKFLOW_LLM_BASE_URL: ${WORKFLOW_LLM_BASE_URL:-}
       WORKFLOW_LLM_MODEL: ${WORKFLOW_LLM_MODEL:-}
     volumes:
-      # 模型文件（先运行 scripts/download_models.sh 填充）
-      - ./models:/workspace/models
-      # 生成结果持久化
-      - ./output:/opt/ComfyUI/output
+      # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
+      # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：
+      #   MODELS_DIR=/data/ai-models/comfy-h3
+      # 目录需提前存在且当前用户可写（Docker 会以 root 创建不存在的 bind 源，
+      # 导致容器内 uid 1000 读不到/写不进）。model 目录一般只读即可，可加 :ro。
+      - ${MODELS_DIR:-./models}:/workspace/models
+      # 生成结果持久化（同样可用 OUTPUT_DIR 指定外部目录）
+      - ${OUTPUT_DIR:-./output}:/opt/ComfyUI/output
     # 可选：限制资源
     # deploy:
     #   resources:

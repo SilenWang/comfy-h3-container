@@ -8,7 +8,10 @@ set -euo pipefail
 BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
 BASE_LORA="https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora/resolve/main"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-MODELS="$HERE/models"
+# 模型目录：默认仓库内 ./models；可用 MODELS_DIR 指向外部目录（与 compose 一致）。
+# 相对路径按仓库根目录解析。
+MODELS="${MODELS_DIR:-$HERE/models}"
+[[ "$MODELS" == /* ]] || MODELS="$HERE/$MODELS"
 
 mkdir -p "$MODELS"/{diffusion_models,text_encoders,vae,loras}
 
