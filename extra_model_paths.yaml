@@ -1,9 +1,12 @@
 # 模型目录映射：把挂载卷 /workspace/models 下的子目录
 # 映射为 ComfyUI 的各模型搜索路径（extra_model_paths.yaml）
-# 子目录结构与 scripts/download_models.sh 保持一致：
+# 子目录结构与 scripts/download_models.sh / scripts/download_models_extra.sh 保持一致：
 #   models/diffusion_models/  models/text_encoders/  models/vae/  models/loras/
+#   models/model_patches/（R2V 的动作控制补丁）  models/checkpoints/（SDPose 姿态提取）
 minimax_h3:
     diffusion_models: /workspace/models/diffusion_models
     text_encoders: /workspace/models/text_encoders
     vae: /workspace/models/vae
     loras: /workspace/models/loras
+    model_patches: /workspace/models/model_patches
+    checkpoints: /workspace/models/checkpoints
