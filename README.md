@@ -254,6 +254,7 @@ models/
 5. **ComfyUI-Copilot 对 H3 的知识有限**：官方托管 API 已停服、必须自备 LLM Key，且其工作流知识库基本不认识 H3/Turbo 专用节点，更适合"生成骨架 + 手工接线"，不是拿来即用的 H3 工作流生成器
 6. Copilot 的 `requirements.txt` 会往 ComfyUI 的 Python 环境里引入一批新依赖（`sqlalchemy<2.0`、`openai`、`langsmith`、`modelscope`、`fastmcp` 等），其中 `urllib3>=1.26,<2.0` 可能覆盖上游版本。若与已有插件冲突，可移除 `pip install` 那一步或改装到独立环境
 7. Comfy MCP Local 的 `launch_comfyui` / 停止 / 日志类工具语义受限：ComfyUI 在容器内由 ai-dock 启动，comfy-cli 再 `launch` 会另起一个进程。日常用 `run_workflow` / `server_info` / `fetch_outputs` 不受影响
+8. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
 
 ## 参考项目与致谢
 
