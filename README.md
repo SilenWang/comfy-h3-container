@@ -274,6 +274,7 @@ models/
 7. Comfy MCP Local 的 `launch_comfyui` / 停止 / 日志类工具语义受限：ComfyUI 在容器内由 ai-dock 启动，comfy-cli 再 `launch` 会另起一个进程。日常用 `run_workflow` / `server_info` / `fetch_outputs` 不受影响
 8. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟）。构建脚本对安装失败做了容错，此时把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退
 9. 自带 workflow **不再内置 EasyCache**：4 步配置下其收益有限且后段可能起颗粒。需要时自行叠加默认参数的 `EasyCache`，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上
+10. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
 
 ## 参考项目与致谢
 
