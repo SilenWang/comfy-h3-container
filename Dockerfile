@@ -31,6 +31,30 @@ RUN git clone --depth 1 \
     /opt/ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-Turbo
 
 # ---------------------------------------------------------------
+# 3b. 12GB 显存优化插件：注意力加速 + 文本编码器显式卸载
+#     - ComfyUI-KJNodes：提供 `PathchSageAttentionKJ`（把模型注意力换成
+#       SageAttention，唯一"不改结果"的提速手段，Ampere/Ada 约 1.3–2x）
+#       https://github.com/kijai/ComfyUI-KJNodes
+#     - ComfyUI-MAINodes：提供 `H3EvictTextEncoder`（conditioning 直通，
+#       编码完成后立刻卸载 Qwen3-VL 文本编码器，避免采样阶段反复经 PCIe 换入换出）
+#       https://github.com/matlowai/ComfyUI-MAINodes
+#     - sageattention：KJ 节点的运行时依赖。无预编译轮子时会在构建期用
+#       ai-dock 自带的 nvcc 编译（耗时数分钟）。12GB 消费卡推荐
+#       `sageattn_qk_int8_pv_fp16_cuda`；装不上时把节点切到 `disabled`
+#       即可无损回退，流程仍能跑。
+#     两个 workflow 已内置这两个节点，无需手动接线。
+# ---------------------------------------------------------------
+RUN git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes \
+        /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes && \
+    git clone --depth 1 https://github.com/matlowai/ComfyUI-MAINodes \
+        /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes && \
+    bash -c "source /opt/environments/python/comfyui/bin/activate && \
+        pip install --no-cache-dir sageattention || \
+        echo 'WARN: sageattention 安装失败；请把 PathchSageAttentionKJ 节点切到 disabled，流程仍可跑'" && \
+    chown -R 1000:1111 /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes \
+                      /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
+
+# ---------------------------------------------------------------
 # 4. 安装 ComfyUI-Copilot：对话式 AI 工作流助手（阿里 AIDC，ACL 2025 Demo）
 #    一句话生成 / 改写 / debug 工作流，装在现有 WebUI 里，插件式可回滚。
 #    参考：https://github.com/AIDC-AI/ComfyUI-Copilot
