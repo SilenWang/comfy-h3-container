@@ -31,6 +31,38 @@ RUN git clone --depth 1 \
     /opt/ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-Turbo
 
 # ---------------------------------------------------------------
+# 3b. 12GB 显存优化插件：注意力加速 + 文本编码器显式卸载
+#     - ComfyUI-KJNodes：提供 `PathchSageAttentionKJ`（把模型注意力换成
+#       SageAttention，唯一"不改结果"的提速手段，Ampere/Ada 约 1.3–2x）
+#       https://github.com/kijai/ComfyUI-KJNodes
+#     - ComfyUI-MAINodes：提供 `H3EvictTextEncoder`（conditioning 直通，
+#       编码完成后立刻卸载 Qwen3-VL 文本编码器，避免采样阶段反复经 PCIe 换入换出）
+#       https://github.com/matlowai/ComfyUI-MAINodes
+#     - sageattention：KJ 节点的运行时依赖。PyPI 上的 sageattention 只有
+#       V1（Triton，仅 `sageattn`/`sageattn_varlen`），不含工作流默认模式
+#       `sageattn_qk_int8_pv_fp16_cuda` 所需的 2.x CUDA 算子，且 2.x 无 PyPI
+#       wheel，因此这里从源码编译官方 v2.2.0（用 ai-dock 自带 nvcc，耗时数分钟）。
+#       两处必要修补：torch>=2.4 头文件要求 C++20，需把 setup.py 的
+#       -std=c++17 改为 c++20；cuSPARSE 头在 pip 包 nvidia-cusparse-cu12 内，
+#       需把 site-packages/nvidia/*/include 加入编译 include 路径。
+#       装不上时把节点切到 `auto`（V1 Triton）或 `disabled` 即可无损回退，流程仍能跑。
+#     两个 workflow 已内置这两个节点，无需手动接线。
+# ---------------------------------------------------------------
+RUN git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes \
+        /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes && \
+    git clone --depth 1 https://github.com/matlowai/ComfyUI-MAINodes \
+        /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes && \
+    bash -c "source /opt/environments/python/comfyui/bin/activate && \
+        git clone --depth 1 --branch v2.2.0 https://github.com/thu-ml/SageAttention /tmp/SageAttention && \
+        sed -i 's/-std=c++17/-std=c++20/g' /tmp/SageAttention/setup.py && \
+        NINCS=\$(for d in /opt/environments/python/comfyui/lib/python3.10/site-packages/nvidia/*/include; do printf ' -I%s' \"\$d\"; done) && \
+        TORCH_CUDA_ARCH_LIST=8.0,8.6 CXX_APPEND_FLAGS=\"\$NINCS\" NVCC_APPEND_FLAGS=\"--threads 8 \$NINCS\" \
+        pip install --no-cache-dir --no-build-isolation /tmp/SageAttention || \
+        echo 'WARN: SageAttention 2.x 构建失败；请把 PathchSageAttentionKJ 节点切到 auto（V1）或 disabled，流程仍可跑'" && \
+    chown -R 1000:1111 /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes \
+                      /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
+
+# ---------------------------------------------------------------
 # 4. 安装 ComfyUI-Copilot：对话式 AI 工作流助手（阿里 AIDC，ACL 2025 Demo）
 #    一句话生成 / 改写 / debug 工作流，装在现有 WebUI 里，插件式可回滚。
 #    参考：https://github.com/AIDC-AI/ComfyUI-Copilot
