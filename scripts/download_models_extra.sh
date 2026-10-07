@@ -2,16 +2,30 @@
 # 下载“更多参考方式”所需的 MiniMax H3 模型：参考生视频（R2V）与动作控制
 # （Fun ControlNet Union / Pose），约 25GB。基础 T2V/I2V 模型见 download_models.sh。
 #
-# 来源：
-#   - 参考/控制主模型与补丁: https://huggingface.co/Comfy-Org/MiniMax-H3
-#   - 姿态提取（SDPose）:      https://huggingface.co/Comfy-Org/SDPose
+# 来源（可用 MODELS_SOURCE 切换，默认 modelscope）：
+#   - ModelScope（魔搭，国内快）: Comfy-Org/MiniMax-H3、Comfy-Org/SDPose
+#   - HuggingFace:               Comfy-Org/MiniMax-H3、Comfy-Org/SDPose
 #
 # 说明：R2V / 多帧参考共用 ref2va 主模型；Fun ControlNet 在 ref2va 之上再挂一个
 # 控制补丁（model_patches/），并用 SDPose 从驱动视频里提取姿态骨架。
 set -euo pipefail
 
-BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
-BASE_SDPOSE="https://huggingface.co/Comfy-Org/SDPose/resolve/main"
+# 下载源：modelscope（默认，魔搭）/ hf（HuggingFace）。可用 MODELS_SOURCE=... 覆盖。
+SOURCE="${MODELS_SOURCE:-modelscope}"
+case "$SOURCE" in
+  modelscope|ms)
+    BASE_H3="https://modelscope.cn/models/Comfy-Org/MiniMax-H3/resolve/master"
+    BASE_SDPOSE="https://modelscope.cn/models/Comfy-Org/SDPose/resolve/master"
+    ;;
+  hf|huggingface)
+    BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
+    BASE_SDPOSE="https://huggingface.co/Comfy-Org/SDPose/resolve/main"
+    ;;
+  *)
+    echo "未知的 MODELS_SOURCE：$SOURCE（可选：modelscope | hf）" >&2
+    exit 2
+    ;;
+esac
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 # 模型目录：默认仓库内 ./models；可用 MODELS_DIR 指向外部目录（与 compose 一致）。
 MODELS="${MODELS_DIR:-$HERE/models}"
@@ -19,12 +33,24 @@ MODELS="${MODELS_DIR:-$HERE/models}"
 
 mkdir -p "$MODELS"/{diffusion_models,loras,model_patches,checkpoints}
 
+# 远端文件大小：优先 HEAD 的 content-length（HuggingFace 可直接拿到）；
+# ModelScope 的 HEAD 不返回长度，改用 Range 请求的 content-range（bytes 0-0/TOTAL）。
+remote_size() {
+  local url="$1" len
+  len="$(curl -fsIL --http1.1 --retry 5 --retry-all-errors "$url" 2>/dev/null \
+    | tr 'A-Z' 'a-z' | awk '/^content-length:/{v=$2} END{gsub(/[^0-9]/,"",v); print v}')"
+  if [ -z "$len" ]; then
+    len="$(curl -fsL --http1.1 --retry 5 --retry-all-errors -r 0-0 -o /dev/null -D - "$url" 2>/dev/null \
+      | tr 'A-Z' 'a-z' | awk '/^content-range:/{n=split($0,a,"/"); v=a[n]; gsub(/[^0-9]/,"",v); print v}')"
+  fi
+  echo "$len"
+}
+
 dl() {
   local url="$1" dest="$2"
-  # 远端文件大小（跟随 302 到最后 CDN，取最后一个 content-length）
+  # 远端文件大小（跟随 302 到最后 CDN）
   local expected
-  expected="$(curl -fsIL --http1.1 --retry 5 --retry-all-errors "$url" 2>/dev/null \
-    | awk 'BEGIN{IGNORECASE=1} /^content-length:/{v=$2} END{gsub(/[^0-9]/,"",v); print v}')"
+  expected="$(remote_size "$url")"
 
   if [ -s "$dest" ]; then
     local have

@@ -27,15 +27,21 @@ up-build = { cmd = "docker compose up -d --build", description = "前台构建�
 down = { cmd = "docker compose down", description = "停止并移除容器" }
 restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyUI 容器" }
 logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
-models = { cmd = "bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB）" }
-models-bg = { cmd = "bash scripts/download_models_bg.sh", description = "后台下载模型（可断点续传，避免前台超时）" }
+# 下载源：默认 modelscope（魔搭，国内快），可用 MODELS_SOURCE=hf 或对应 -hf 任务切回 HuggingFace
+models = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB，默认魔搭）" }
+models-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh", description = "后台下载模型（约 43GB，默认魔搭，可断点续传）" }
 models-status = { cmd = "bash scripts/models_status.sh", description = "查看后台模型下载进度" }
 models-logs = { cmd = "tail -f .build/models.log", description = "跟踪后台模型下载日志" }
 # 参考/控制模型（R2V 多视角参考 + Fun ControlNet 动作控制，约 25GB，可选）
-models-extra = { cmd = "bash scripts/download_models_extra.sh", description = "下载参考/控制模型（R2V + Pose 动作控制）" }
-models-extra-bg = { cmd = "bash scripts/download_models_bg.sh extra", description = "后台下载参考/控制模型（可断点续传）" }
+models-extra = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_extra.sh", description = "下载参考/控制模型（R2V + Pose 动作控制，默认魔搭）" }
+models-extra-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh extra", description = "后台下载参考/控制模型（默认魔搭，可断点续传）" }
 models-extra-status = { cmd = "bash scripts/models_status.sh extra", description = "查看后台参考/控制模型下载进度" }
 models-extra-logs = { cmd = "tail -f .build/models_extra.log", description = "跟踪后台参考/控制模型下载日志" }
+# HuggingFace 源（国内一般不需要；等价于给上面的任务加 MODELS_SOURCE=hf）
+models-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models.sh", description = "从 HuggingFace 下载 MiniMax H3 模型（约 43GB）" }
+models-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh", description = "后台从 HuggingFace 下载模型（可断点续传）" }
+models-extra-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_extra.sh", description = "从 HuggingFace 下载参考/控制模型" }
+models-extra-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh extra", description = "后台从 HuggingFace 下载参考/控制模型（可断点续传）" }
 
 # ── Comfy MCP Local ─────────────────────────────────────────────────────
 # 推荐：容器内运行（免认证、免宿主 workspace），客户端配置见 mcp-config。
