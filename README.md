@@ -8,6 +8,9 @@
 
 - Docker 容器化，一条命令启动（`docker compose up -d`）
 - 原生支持 MiniMax H3（T2V / I2V / R2V，视频 + 32kHz 立体声音频同步生成）
+- **参考生视频（R2V）**：最多 9 张参考图 / 3 段参考视频 / 3 段参考音频，锁定人物长相、风格、动作、运镜、音色（多视角人物图防“长相抖动”就靠它）
+- **动作控制（Fun ControlNet Union）**：用姿态 / 深度 / 边缘 / HED / MLSD 控制视频驱动画面（内置 SDPose 从舞蹈视频提骨架），也支持 mask 局部重绘
+- **多帧参考（Multiframe Reference）**：在时间轴任意帧锚定参考图或音频
 - 12GB 显存实测可跑（int8 量化 + `--lowvram` + CPU offload）
 - Turbo 4 步 LoRA 加速（实测提速 ~4.4×）
 - **SageAttention 注意力加速**：两个 workflow 已内置 `PathchSageAttentionKJ` 节点（Ampere/Ada 约 1.3–2×，不改生成结果）
@@ -68,6 +71,13 @@ pixi run models-logs     # 实时跟踪 .build/models.log
 
 脚本会按远端 `content-length` 校验完整性：中断后重跑 `pixi run models-bg` 会从断点接着下，**已下载但未完成的文件不会被误跳**。
 
+> 想用**参考生视频（R2V）**或**动作控制（Fun ControlNet）**，再下约 25GB 的额外模型（`ref2va` 主模型、控制补丁、参考 Turbo LoRA、SDPose 姿态提取）：
+> ```bash
+> pixi run models-extra-bg        # 后台启动（可断点续传）
+> pixi run models-extra-status    # 查看进度
+> ```
+> 只在做 T2V/I2V 时不必下载这部分，见下文「更多参考方式」。
+
 ### 用外部模型目录（避免每次重新下载）
 
 模型本来就存在挂载卷里，容器重建不会丢。默认落在仓库内的 `./models`；如果想多个项目 / 多台机器共用同一份模型（比如放在 NAS 或大盘上），把 `MODELS_DIR` 指向外部目录即可：
@@ -106,7 +116,7 @@ pixi run up             # 构建完成后启动容器（镜像已就绪，不再
 
 ### 生成视频
 
-1. WebUI 打开模板库（Template Library）→ Video → 选择 `MiniMax H3 Text to Video (T2V)` / `Image to Video (I2V)`
+1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板
 2. 点 Queue 执行，等待输出（右侧 Video 面板可预览/下载）
 3. 输出文件同时保存在宿主的 `./output/` 目录
 
@@ -130,6 +140,38 @@ CLIPLoader ──→ MiniMaxH3ImageToVideo.clip
 ```
 
 > **EasyCache 仅在需要时单独叠加**：它在较长片段 / 较多步数时收益明显（约 1.8×），但 4 步配置下收益有限、且后段可能起颗粒，因此**未**放进自带 workflow。要用就自行添加默认参数的 `EasyCache` 节点，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上。
+
+## 更多参考方式：R2V / 动作控制 / 多帧参考
+
+除 T2V / I2V 外，H3 原生支持三种更强的「参考」玩法。仓库已附对应官方工作流，使用前先下额外模型（约 25GB，见上文 `pixi run models-extra-bg`）。这几个模板需要 **ComfyUI ≥ 0.35.0**——本镜像构建时会拉最新 master，满足要求。
+
+### 1. 多视角人物一致性：参考生视频（R2V）
+
+`minimax_h3_r2v.json`，核心是 `MiniMax H3 Reference to Video` 节点。给同一个人的正面 / 侧面 / 背面等多张图，模型据此锁定长相，显著降低视频里脸部和服装的抖动漂移。
+
+- 参考可以是图片、视频、音频的任意组合，上限 **9 张图 + 3 段视频 + 3 段音频**。
+- 在 prompt 里按连接顺序用 `<Picture 1>`、`<Video 1>`、`<Audio 1>` 引用，并**显式分工**（哪张管长相、哪张管风格、哪段管动作 / 运镜 / 音色）——官方实测这样效果好很多。
+- `ref_image_size`：`match`（缩到出图分辨率，快）；`max`（短边最高 2048，长相更准但更慢）。
+- R2V 用的是 **ref2va** 主模型，与 T2V / I2V 的 `fl2va` 是两套权重（额外模型里已含）。
+- 4 步 Turbo LoRA 会削弱参考约束：人物越要像，越应跑 **20 步（必要时 25 步）**。
+
+### 2. 舞蹈 / 动作控制：Fun ControlNet Union
+
+`minimax_h3_fun_controlnet_union.json`，核心是 `Apply MiniMax H3 Fun ControlNet` 节点，把一段**控制视频**作为运动模板。单个检查点同时支持 **Canny / Depth / HED / MLSD / Pose**，还能接 `mask` 做局部重绘。
+
+- 工作流自带 **SDPose 子图**：直接喂一段舞蹈视频，它自动提取骨骼，输出复现舞者动作（示例输入即 `dancer_field_pose.mp4`）。也可自行预处理后直接接 `control_video`。
+- `guidance_scale` 保持 1.0；只有画面明显偏离控制时才把补丁 `strength` 调大。
+- 依赖 `model_patches/` 下的控制补丁与 `checkpoints/` 下的 SDPose，需 ComfyUI ≥ 0.35.0。
+- 想「免姿态提取、直接迁移动作且保住人物身份」，可另试 Wan Animate 2（另一条管线，要另下模型，本仓库未内置）。
+
+### 3. 时间轴锚点：多帧参考（Multiframe Reference）
+
+`minimax_h3_multiframe_reference.json`，用 `MiniMaxH3AddGuide` 在**任意帧**锚定参考图 / 音频（不再局限于首尾帧）。例如在第 60 帧钉一张定妆图，强制视频经过该帧；或喂前 22 帧 + 音频让模型续写。
+
+- 把 H3 节点的 `positive` 与 latent 接到 `MiniMaxH3AddGuide`，给 `image` / `audio` + `frame_idx`（负数从尾部数）；可串联多个节点锚多个帧。
+- 它是**条件锚点**而非视频转视频：要改风格用 R2V，要重绘局部用 Fun ControlNet 的 mask。
+
+> 这三个模板基于 Comfy-Org 官方模板，仅把视频 VAE 指向本仓库已下载的 `minimax_h3_video_vae_fp16.safetensors`，省去重复下载 int8 VAE。
 
 ## AI 辅助：对话式搭 / 改工作流
 
@@ -248,8 +290,15 @@ models/
 ├── vae/minimax_h3_video_vae_fp16.safetensors                            5.21 GB
 ├── vae/minimax_h3_audio_vae_fp32.safetensors                            0.61 GB
 ├── loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors      1.96 GB（可选）
-└── loras/minimax_h3_turbo_v4_step600_ema.safetensors                    0.78 GB（推荐）
+├── loras/minimax_h3_turbo_v4_step600_ema.safetensors                    0.78 GB（推荐）
+├── diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors  19.53 GB（R2V，额外）
+├── loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors     1.82 GB（R2V Turbo，额外）
+├── model_patches/minimax_h3_fun_controlnet_union_pruned_int8_convrot…  2.14 GB（动作控制，额外）
+├── checkpoints/sdpose_wholebody_fp16.safetensors                        1.79 GB（姿态提取，额外）
+└── diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors                 0.12 GB（SDPose 检测器，额外）
 ```
+
+> 后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra-bg` 下载；只做 T2V / I2V 不必装。
 
 ## 📊 实测性能（RTX 3060 12GB）
 
@@ -275,6 +324,9 @@ models/
 8. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟）。构建脚本对安装失败做了容错，此时把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退
 9. 自带 workflow **不再内置 EasyCache**：4 步配置下其收益有限且后段可能起颗粒。需要时自行叠加默认参数的 `EasyCache`，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上
 10. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
+11. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
+12. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
+13. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
 
 ## 参考项目与致谢
 
