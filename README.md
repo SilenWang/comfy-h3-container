@@ -61,22 +61,24 @@ docker compose up -d --build
 
 ### 模型下载（可能几小时，支持断点续传）
 
-到 HuggingFace CDN 的连接不稳定（HTTP/2 偶发中断、限速），脚本已强制 HTTP/1.1、开启自动重试与断点续传。后台方式：
+**默认从 ModelScope（魔搭）下载**，国内速度快；也可切回 HuggingFace。脚本强制 HTTP/1.1、自动重试、断点续传。后台方式：
 
 ```bash
-pixi run models-bg       # 后台启动下载，立即返回
+pixi run models-bg       # 后台启动下载（默认魔搭），立即返回
 pixi run models-status   # 查看各文件已下载大小与日志尾部
 pixi run models-logs     # 实时跟踪 .build/models.log
 ```
 
-脚本会按远端 `content-length` 校验完整性：中断后重跑 `pixi run models-bg` 会从断点接着下，**已下载但未完成的文件不会被误跳**。
+切换下载源：加环境变量 `MODELS_SOURCE=modelscope|hf`（默认 `modelscope`），或直接用 `-hf` 任务，例如 `pixi run models-hf-bg`。两个模型仓库（`Comfy-Org/MiniMax-H3`、`Comfy-Org/SDPose`、`larryvrh/MiniMax-H3-Turbo-Lora`）在魔搭上都有对应文件。
+
+脚本会按远端大小校验完整性：中断后重跑 `pixi run models-bg` 会从断点接着下，**已下载但未完成的文件不会被误跳**。
 
 > 想用**参考生视频（R2V）**或**动作控制（Fun ControlNet）**，再下约 25GB 的额外模型（`ref2va` 主模型、控制补丁、参考 Turbo LoRA、SDPose 姿态提取）：
 > ```bash
-> pixi run models-extra-bg        # 后台启动（可断点续传）
+> pixi run models-extra-bg        # 后台启动（默认魔搭，可断点续传）
 > pixi run models-extra-status    # 查看进度
 > ```
-> 只在做 T2V/I2V 时不必下载这部分，见下文「更多参考方式」。
+> 切 HuggingFace 用 `pixi run models-extra-hf-bg` 或 `MODELS_SOURCE=hf pixi run models-extra-bg`。只在做 T2V/I2V 时不必下载这部分，见下文「更多参考方式」。
 
 ### 用外部模型目录（避免每次重新下载）
 

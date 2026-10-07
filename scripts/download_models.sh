@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 # 下载 MiniMax H3 量化模型（ComfyUI 官方版）与 Turbo 4 步 LoRA，约 43GB
-# 来源：
-#   - 量化模型: https://huggingface.co/Comfy-Org/MiniMax-H3
-#   - Turbo LoRA: https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora
+# 来源（可用 MODELS_SOURCE 切换，默认 modelscope）：
+#   - ModelScope（魔搭，国内快）: https://modelscope.cn/models/Comfy-Org/MiniMax-H3
+#   - HuggingFace:               https://huggingface.co/Comfy-Org/MiniMax-H3
 set -euo pipefail
 
-BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
-BASE_LORA="https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora/resolve/main"
+# 下载源：modelscope（默认，魔搭）/ hf（HuggingFace）。可用 MODELS_SOURCE=... 覆盖。
+SOURCE="${MODELS_SOURCE:-modelscope}"
+case "$SOURCE" in
+  modelscope|ms)
+    BASE_H3="https://modelscope.cn/models/Comfy-Org/MiniMax-H3/resolve/master"
+    BASE_LORA="https://modelscope.cn/models/larryvrh/MiniMax-H3-Turbo-Lora/resolve/master"
+    ;;
+  hf|huggingface)
+    BASE_H3="https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main"
+    BASE_LORA="https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora/resolve/main"
+    ;;
+  *)
+    echo "未知的 MODELS_SOURCE：$SOURCE（可选：modelscope | hf）" >&2
+    exit 2
+    ;;
+esac
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 # 模型目录：默认仓库内 ./models；可用 MODELS_DIR 指向外部目录（与 compose 一致）。
 # 相对路径按仓库根目录解析。
@@ -15,12 +29,24 @@ MODELS="${MODELS_DIR:-$HERE/models}"
 
 mkdir -p "$MODELS"/{diffusion_models,text_encoders,vae,loras}
 
+# 远端文件大小：优先 HEAD 的 content-length（HuggingFace 可直接拿到）；
+# ModelScope 的 HEAD 不返回长度，改用 Range 请求的 content-range（bytes 0-0/TOTAL）。
+remote_size() {
+  local url="$1" len
+  len="$(curl -fsIL --http1.1 --retry 5 --retry-all-errors "$url" 2>/dev/null \
+    | tr 'A-Z' 'a-z' | awk '/^content-length:/{v=$2} END{gsub(/[^0-9]/,"",v); print v}')"
+  if [ -z "$len" ]; then
+    len="$(curl -fsL --http1.1 --retry 5 --retry-all-errors -r 0-0 -o /dev/null -D - "$url" 2>/dev/null \
+      | tr 'A-Z' 'a-z' | awk '/^content-range:/{n=split($0,a,"/"); v=a[n]; gsub(/[^0-9]/,"",v); print v}')"
+  fi
+  echo "$len"
+}
+
 dl() {
   local url="$1" dest="$2"
-  # 远端文件大小（跟随 302 到最后 CDN，取最后一个 content-length）
+  # 远端文件大小（跟随 302 到最后 CDN）
   local expected
-  expected="$(curl -fsIL --http1.1 --retry 5 --retry-all-errors "$url" 2>/dev/null \
-    | awk 'BEGIN{IGNORECASE=1} /^content-length:/{v=$2} END{gsub(/[^0-9]/,"",v); print v}')"
+  expected="$(remote_size "$url")"
 
   if [ -s "$dest" ]; then
     local have
