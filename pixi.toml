@@ -27,6 +27,9 @@ up-build = { cmd = "docker compose up -d --build", description = "前台构建�
 down = { cmd = "docker compose down", description = "停止并移除容器" }
 restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyUI 容器" }
 logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
+# 修复既有容器：PathchSageAttentionKJ 报 ModuleNotFoundError: No module named 'sageattention'
+# 时，在运行中的容器里现场编译安装 SageAttention v2.2.0（无需重建镜像）
+fix-sage-attn = { cmd = "bash scripts/install_sageattention.sh", description = "在运行中的容器里现场安装 SageAttention v2.2.0（修复 PathchSageAttentionKJ 的 ModuleNotFoundError）" }
 # 下载源：默认 modelscope（魔搭，国内快），可用 MODELS_SOURCE=hf 或对应 -hf 任务切回 HuggingFace
 models = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB，默认魔搭）" }
 models-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh", description = "后台下载模型（约 43GB，默认魔搭，可断点续传）" }

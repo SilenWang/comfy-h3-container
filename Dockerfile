@@ -45,20 +45,52 @@ RUN git clone --depth 1 \
 #       两处必要修补：torch>=2.4 头文件要求 C++20，需把 setup.py 的
 #       -std=c++17 改为 c++20；cuSPARSE 头在 pip 包 nvidia-cusparse-cu12 内，
 #       需把 site-packages/nvidia/*/include 加入编译 include 路径。
-#       装不上时把节点切到 `auto`（V1 Triton）或 `disabled` 即可无损回退，流程仍能跑。
+#       **注意**：源码走 codeload tarball 而不是 `git clone`。`git clone` 在部分
+#       构建机上会卡在 index-pack / 超时失败，而下面用 `|| echo WARN` 做了容错，
+#       于是镜像"构建成功"却漏装 sageattention，运行时报
+#       ModuleNotFoundError。改 tarball + 重试可消除这个静默失败。
+#       另外先装 PyPI 的 V1 作为兜底：即使 2.x 编译失败，`sageattention` 模块
+#       仍可导入，把节点切到 `auto`（V1 Triton）或 `disabled` 即可无损回退。
+#       最后固定 MAX_JOBS（默认 32 在部分机器上会随机编译失败），失败后降并行度重试一次。
 #     两个 workflow 已内置这两个节点，无需手动接线。
 # ---------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes \
-        /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes && \
-    git clone --depth 1 https://github.com/matlowai/ComfyUI-MAINodes \
-        /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes && \
-    bash -c "source /opt/environments/python/comfyui/bin/activate && \
-        git clone --depth 1 --branch v2.2.0 https://github.com/thu-ml/SageAttention /tmp/SageAttention && \
-        sed -i 's/-std=c++17/-std=c++20/g' /tmp/SageAttention/setup.py && \
-        NINCS=\$(for d in /opt/environments/python/comfyui/lib/python3.10/site-packages/nvidia/*/include; do printf ' -I%s' \"\$d\"; done) && \
-        TORCH_CUDA_ARCH_LIST=8.0,8.6 CXX_APPEND_FLAGS=\"\$NINCS\" NVCC_APPEND_FLAGS=\"--threads 8 \$NINCS\" \
-        pip install --no-cache-dir --no-build-isolation /tmp/SageAttention || \
-        echo 'WARN: SageAttention 2.x 构建失败；请把 PathchSageAttentionKJ 节点切到 auto（V1）或 disabled，流程仍可跑'" && \
+RUN for repo in \
+        "https://github.com/kijai/ComfyUI-KJNodes /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes" \
+        "https://github.com/matlowai/ComfyUI-MAINodes /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes"; do \
+        set -- $repo; url=$1; dir=$2; \
+        for i in 1 2 3 4 5; do \
+            git clone --depth 1 "$url" "$dir" && break; \
+            rm -rf "$dir"; echo "git clone $url 重试 $i ..."; sleep 5; \
+        done; \
+        test -d "$dir/.git"; \
+    done && \
+    bash -c "set -e && source /opt/environments/python/comfyui/bin/activate && \
+        pip install --no-cache-dir --upgrade pip setuptools wheel ninja packaging && \
+        pip install --no-cache-dir sageattention && \
+        if ( \
+          for i in 1 2 3; do \
+            curl -fsSL --connect-timeout 20 --max-time 600 --speed-limit 1024 --speed-time 30 \
+              --retry 3 --retry-delay 5 -o /tmp/sa2.tar.gz \
+              https://codeload.github.com/thu-ml/SageAttention/tar.gz/refs/tags/v2.2.0 && break; \
+            echo \"SageAttention 源码下载重试 \$i ...\"; sleep 5; \
+          done && \
+          gzip -t /tmp/sa2.tar.gz && \
+          rm -rf /tmp/SageAttention && mkdir -p /tmp/SageAttention && \
+          tar xzf /tmp/sa2.tar.gz -C /tmp/SageAttention --strip-components=1 && \
+          sed -i 's/-std=c++17/-std=c++20/g' /tmp/SageAttention/setup.py && \
+          NINCS=\$(for d in /opt/environments/python/comfyui/lib/python3.10/site-packages/nvidia/*/include; do printf ' -I%s' \"\$d\"; done) && \
+          ( TORCH_CUDA_ARCH_LIST=8.0,8.6 MAX_JOBS=8 EXT_PARALLEL=8 CXX_APPEND_FLAGS=\"\$NINCS\" NVCC_APPEND_FLAGS=\"--threads 4 \$NINCS\" \
+              pip install --no-cache-dir --no-build-isolation /tmp/SageAttention || \
+            { echo '首次编译失败，清理后降低并行度重试...'; rm -rf /tmp/SageAttention/build; \
+              TORCH_CUDA_ARCH_LIST=8.0,8.6 MAX_JOBS=2 EXT_PARALLEL=2 CXX_APPEND_FLAGS=\"\$NINCS\" NVCC_APPEND_FLAGS=\"--threads 4 \$NINCS\" \
+                pip install --no-cache-dir --no-build-isolation /tmp/SageAttention; } \
+          ) && \
+          python -c 'from sageattention import sageattn_qk_int8_pv_fp16_cuda' \
+        ); then \
+          echo 'SageAttention v2.2.0 编译安装成功：PathchSageAttentionKJ 的 cuda 模式可用'; \
+        else \
+          echo 'WARN: SageAttention 2.x 构建失败，已保留 PyPI V1；请把 PathchSageAttentionKJ 节点切到 auto（V1 Triton）或 disabled，流程仍可跑'; \
+        fi" && \
     chown -R 1000:1111 /opt/ComfyUI/custom_nodes/ComfyUI-KJNodes \
                       /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
 
