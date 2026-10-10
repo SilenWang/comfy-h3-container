@@ -12,7 +12,9 @@
 #
 # artokun/comfyui-mcp（第三方，能让 Agent 直接搭建 / 编辑工作流）：
 #   随容器由 supervisord 托管，容器内以 Streamable HTTP 暴露（宿主端口见 compose，
-#   默认 127.0.0.1:9100），日志随容器日志。远程客户端连 URL + Bearer token。
+#   默认 0.0.0.0:9100，同机其他容器 / 局域网可达），日志随容器日志。
+#   远程客户端连 URL + Bearer token；同机其他容器别用 127.0.0.1（那是容器自己的
+#   loopback），要用宿主 IP，或加 --add-host host.docker.internal:host-gateway。
 set -euo pipefail
 
 MODE="${1:-docker}"
@@ -88,10 +90,13 @@ case "$MODE" in
     ENDPOINT="http://$(public_host):${MCP_PORT}/mcp"
     echo "# ── artokun comfyui-mcp · 容器内托管服务（Streamable HTTP）─────────"
     echo "# 随容器启动（supervisord 托管），无需额外起进程；宿主端口见 docker-compose.yml"
-    echo "# （默认 127.0.0.1:9100 → 容器内 19100）。"
+    echo "# （默认 0.0.0.0:9100 → 容器内 19100，同机其他容器 / 局域网可访问）。"
     echo "# 端点：${ENDPOINT}"
     echo "# 鉴权：请求头 Authorization: Bearer <token> 或 X-API-Key: <token>"
     echo "# 日志：与 comfyui / caddy 一起进容器日志（pixi run logs）"
+    echo "# 同机其他容器：不能用 127.0.0.1（那是容器自己的 loopback），用宿主 IP，"
+    echo "#   或在那个容器上 --add-host host.docker.internal:host-gateway 后用"
+    echo "#   http://host.docker.internal:${MCP_PORT}/mcp。"
     echo
     echo "## Claude Code —— 一条命令注册："
     echo "claude mcp add --transport http comfyui ${ENDPOINT} \\"
