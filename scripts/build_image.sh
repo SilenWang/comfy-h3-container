@@ -2,7 +2,7 @@
 # 构建 / 续建 ComfyUI + H3 镜像。
 #
 # 为什么不用直接 `docker compose build`：
-#   整镜像首次构建要拉 torch cu126、ComfyUI 依赖、Copilot 依赖，远超一次性
+#   整镜像首次构建要拉 torch cu126、ComfyUI 依赖，远超一次性
 #   前台命令能跑完的时间。前台阻塞会拖住调用方（Agent 运行会在空闲/总时长
 #   上限处被强制停止），但 Docker 已完成的分层会写进 BuildKit 缓存，
 #   所以“后台启动 + 反复重跑”可以断点续建，重跑只会补没缓存的那几步。

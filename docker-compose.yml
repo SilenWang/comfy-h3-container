@@ -2,14 +2,15 @@
 # 前提：NVIDIA GPU + nvidia-container-toolkit（docker run --gpus all 可用）
 #
 # 用法：
-#   cp .env.example .env           # 认证 / Copilot LLM 等配置（默认已关闭密码）
+#   cp .env.example .env           # 认证等配置（默认已关闭密码）
 #   ./scripts/download_models.sh   # 下载模型（约 43GB）
 #   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
 # AI 辅助（镜像内已装好）：
-#   ComfyUI-Copilot  在 WebUI 侧栏，需在 .env 或面板里填一个 LLM
-#   Comfy MCP Local  客户端配置见 `pixi run mcp-config`（或 ./scripts/mcp_client_config.sh）
+#   Comfy MCP Local  容器内 stdio server，客户端配置见 `pixi run mcp-config`
+#                    远程 HTTP（Streamable HTTP / SSE）见 `pixi run mcp-http`，
+#                    或 ./scripts/mcp_client_config.sh http
 services:
   comfyui:
     build: .
@@ -34,14 +35,6 @@ services:
       COMFYUI_PORT_HOST: "8188"
       # --lowvram：按需加载/卸载，12GB 显卡实测关键参数
       COMFYUI_ARGS: "--listen 0.0.0.0 --lowvram"
-      # ComfyUI-Copilot 的 LLM（可选；留空则启动后在 WebUI 侧栏 Settings 里填）
-      # OpenAI 兼容端点即可，例如 DeepSeek：CC_OPENAI_BASE_URL=https://api.deepseek.com/v1
-      CC_OPENAI_API_KEY: ${CC_OPENAI_API_KEY:-}
-      CC_OPENAI_BASE_URL: ${CC_OPENAI_BASE_URL:-}
-      # 工作流生成可用独立模型（可选，不填则复用上面的聊天模型）
-      WORKFLOW_LLM_API_KEY: ${WORKFLOW_LLM_API_KEY:-}
-      WORKFLOW_LLM_BASE_URL: ${WORKFLOW_LLM_BASE_URL:-}
-      WORKFLOW_LLM_MODEL: ${WORKFLOW_LLM_MODEL:-}
     volumes:
       # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
       # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：

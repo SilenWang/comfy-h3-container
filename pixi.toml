@@ -1,7 +1,7 @@
 [workspace]
 name = "comfy-h3-container"
 version = "0.1.0"
-description = "ComfyUI + MiniMax H3 容器化部署：统一任务入口 + 宿主侧 Comfy MCP Local 环境"
+description = "ComfyUI + MiniMax H3 容器化部署：统一任务入口 + 宿主侧 Comfy MCP Local / 远程 HTTP MCP 环境"
 authors = ["SilenWang"]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
@@ -11,6 +11,8 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 # （容器内也装了同一套，推荐那种更省事的方式，见 README）。
 [dependencies]
 python = "3.11.*"
+# 宿主侧 MCP HTTP 网桥（supergateway）用 Node 运行；容器内的 comfy-mcp/ComfyUI 不受影响。
+nodejs = "20.*"
 
 [pypi-dependencies]
 # comfy-cli 是 comfy-mcp 的引擎（每个工具都 shell out 到 `comfy --json`）
@@ -51,3 +53,7 @@ models-extra-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.s
 mcp-config = { cmd = "bash scripts/mcp_client_config.sh", description = "打印 MCP 客户端配置片段（默认容器模式）" }
 # 备选：宿主侧运行。需要 comfy-cli 已有可用 workspace，见 README。
 mcp = { cmd = "comfy-mcp", description = "启动宿主侧 Comfy MCP Local（stdio server）" }
+# 远程：把容器内 stdio MCP 网桥成 HTTP，供本机/局域网/远程 MCP 客户端连接。
+# supergateway 会自动拉起 `docker exec -i comfyui-h3 comfy-mcp`。
+mcp-http = { cmd = "MCP_HTTP_TRANSPORT=streamableHttp bash scripts/mcp_http_server.sh", description = "远程 Streamable HTTP MCP（默认 0.0.0.0:8765/mcp，MCP 现行标准）" }
+mcp-sse = { cmd = "MCP_HTTP_TRANSPORT=sse bash scripts/mcp_http_server.sh", description = "远程 HTTP+SSE MCP（默认 0.0.0.0:8765/sse，旧版传输）" }
