@@ -2,11 +2,13 @@
 # 后台下载 MiniMax H3 模型。首次下载很慢（实测 hf CDN 约 3MB/s），
 # 远超一次性前台命令能跑完的时间，所以放到后台并保留可断点续传的日志。
 #
-#   ./scripts/download_models_bg.sh          # 基础模型（约 43GB），默认
-#   ./scripts/download_models_bg.sh extra    # 参考/控制模型（约 25GB）
+#   ./scripts/download_models_bg.sh            # 基础模型（约 43GB），默认
+#   ./scripts/download_models_bg.sh extra      # 参考/控制模型（约 25GB）
+#   ./scripts/download_models_bg.sh upscaler   # SeedVR2 放大模型（约 4GB）
 #
 #   pixi run models-status             # 查看基础模型下载进度
 #   pixi run models-extra-status       # 查看参考/控制模型下载进度
+#   pixi run models-upscaler-status    # 查看放大模型下载进度
 #   pixi run models-logs               # 跟踪基础模型下载日志
 set -euo pipefail
 
@@ -14,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT/.build"
 mkdir -p "$BUILD_DIR"
 
-# 模型集：base（默认）或 extra。各自独立的脚本 / 日志 / PID。
+# 模型集：base（默认）/ extra / upscaler。各自独立的脚本 / 日志 / PID。
 case "${1:-base}" in
   base)
     SCRIPT="scripts/download_models.sh"
@@ -28,8 +30,14 @@ case "${1:-base}" in
     PIDF="$BUILD_DIR/models_extra.pid"
     STATUS_CMD="pixi run models-extra-status"
     ;;
+  upscaler)
+    SCRIPT="scripts/download_models_upscaler.sh"
+    LOG="$BUILD_DIR/models_upscaler.log"
+    PIDF="$BUILD_DIR/models_upscaler.pid"
+    STATUS_CMD="pixi run models-upscaler-status"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | upscaler）" >&2
     exit 2
     ;;
 esac

@@ -45,6 +45,13 @@ models-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models.sh", descript
 models-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh", description = "后台从 HuggingFace 下载模型（可断点续传）" }
 models-extra-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_extra.sh", description = "从 HuggingFace 下载参考/控制模型" }
 models-extra-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh extra", description = "后台从 HuggingFace 下载参考/控制模型（可断点续传）" }
+# 高清化模型（SeedVR2 3B 放大/修复，约 4GB，可选）：工作流里「HD Upscale (SeedVR2 3B)」那一段用
+models-upscaler = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_upscaler.sh", description = "下载 SeedVR2 3B 放大模型（约 4GB，默认魔搭）" }
+models-upscaler-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh upscaler", description = "后台下载 SeedVR2 放大模型（默认魔搭，可断点续传）" }
+models-upscaler-status = { cmd = "bash scripts/models_status.sh upscaler", description = "查看后台 SeedVR2 放大模型下载进度" }
+models-upscaler-logs = { cmd = "tail -f .build/models_upscaler.log", description = "跟踪后台 SeedVR2 放大模型下载日志" }
+models-upscaler-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_upscaler.sh", description = "从 HuggingFace 下载 SeedVR2 放大模型" }
+models-upscaler-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh upscaler", description = "后台从 HuggingFace 下载 SeedVR2 放大模型（可断点续传）" }
 
 # ── Comfy MCP Local ─────────────────────────────────────────────────────
 # 推荐：容器内运行（免认证、免宿主 workspace），客户端配置见 mcp-config。
