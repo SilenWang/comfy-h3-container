@@ -95,42 +95,7 @@ RUN for repo in \
                       /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
 
 # ---------------------------------------------------------------
-# 4. 安装 ComfyUI-Copilot：对话式 AI 工作流助手（阿里 AIDC，ACL 2025 Demo）
-#    一句话生成 / 改写 / debug 工作流，装在现有 WebUI 里，插件式可回滚。
-#    参考：https://github.com/AIDC-AI/ComfyUI-Copilot
-#    注意 1：官方托管 API 已停服，必须在 WebUI 的 Copilot 面板 Settings 里
-#            填自备 LLM（OpenAI 兼容端点，如 DeepSeek），或用下面的
-#            CC_OPENAI_API_KEY / CC_OPENAI_BASE_URL 环境变量注入。
-#    注意 2：仓库自带上游构建好的前端（dist/copilot_web），无需 npm 构建。
-#    注意 3：必须先升级 pip。基础镜像自带的 pip 很旧，其解析器会在
-#            sqlalchemy>=1.4,<2.0 与 fastmcp/openai-agents 的依赖间反复回溯，
-#            最后尝试源码编译远古 greenlet（<0.4.17 的 setup.py 在 py3.10 下
-#            语法错误）而失败。升级到新版 pip 后一次解析成功。
-#    注意 4：Copilot 的 requirements 把 SQLAlchemy 限在 <2.0，会覆盖 ComfyUI
-#            自己要求的 >=2.0，导致 ComfyUI 启动时报
-#            "cannot import name '_NoneName' from 'sqlalchemy.sql.base'"。
-#            Copilot 只用到 create_engine/declarative_base/sessionmaker 等
-#            2.0 兼容 API，所以装完再把 SQLAlchemy 提到 >=2.0。
-#    注意 5：Copilot 运行时要往自己目录写 logs/，而 custom_nodes 是 root 克隆的，
-#            ComfyUI 以非 root 运行会 PermissionError。这里按运行时 UID/GID
-#            数字 chown（ai-dock 的 user/ai-dock 账号是 entrypoint 运行时才建的，
-#            构建阶段按名字 chown 会报 invalid user）。
-# ---------------------------------------------------------------
-RUN CLONE_DIR=/opt/ComfyUI/custom_nodes/ComfyUI-Copilot; \
-    rm -rf "$CLONE_DIR"; \
-    for i in 1 2 3; do \
-        git clone --depth 1 https://github.com/AIDC-AI/ComfyUI-Copilot "$CLONE_DIR" && break; \
-        rm -rf "$CLONE_DIR"; echo "clone retry $i ..."; sleep 5; \
-    done; \
-    test -d "$CLONE_DIR"; \
-    bash -c "source /opt/environments/python/comfyui/bin/activate && \
-        pip install --no-cache-dir --upgrade pip && \
-        pip install --no-cache-dir -r /opt/ComfyUI/custom_nodes/ComfyUI-Copilot/requirements.txt && \
-        pip install --no-cache-dir 'SQLAlchemy>=2.0.0'" && \
-    chown -R 1000:1111 "$CLONE_DIR"
-
-# ---------------------------------------------------------------
-# 5. 安装 Comfy MCP Local：官方 stdio MCP server（引擎是 comfy-cli）
+# 4. 安装 Comfy MCP Local：官方 stdio MCP server（引擎是 comfy-cli）
 #    参考：https://github.com/Comfy-Org/comfy-mcp
 #    装在容器内，MCP 客户端用 `docker exec -i comfyui-h3 comfy-mcp` 调起，
 #    直接驱动容器内 ComfyUI，不经过 caddy 反代，因此与 WebUI 认证无关。
@@ -149,6 +114,43 @@ RUN bash -c "source /opt/environments/python/comfyui/bin/activate && \
         comfy --version && comfy-mcp --version"
 
 # ---------------------------------------------------------------
+# 5. 安装 artokun/comfyui-mcp：第三方 ComfyUI MCP（让 Agent 直接搭建/编辑工作流
+#    并提供原生远程 HTTP），以 Node 运行，并作为容器内 supervisor 托管服务随容器启动。
+#    参考：https://github.com/artokun/comfyui-mcp（npm 包 comfyui-mcp）
+#    - 要求 Node >= 22：装官方 Node 22 的 linux tarball（.tar.gz，免 xz 依赖），
+#      再 `npm -g` 安装固定版本 comfyui-mcp。
+#    - 服务由 supervisord 拉起（docker/supervisor-comfyui-mcp.conf +
+#      docker/supervisor-comfyui-mcp.sh），日志写 /var/log/supervisor/comfyui-mcp.log；
+#      ai-dock 的 logtail 会把 /var/log/supervisor/*.log 汇总进 `docker logs`，
+#      因此 comfyui / caddy / comfyui-mcp 的日志在容器日志里都能看到。
+#    - 传输：Streamable HTTP，监听容器内 0.0.0.0:19100（由 compose 映射到宿主）。
+# ---------------------------------------------------------------
+ARG NODE_VERSION=v22.23.2
+ARG COMFYUI_MCP_VERSION=0.52.205
+RUN set -eux; \
+    case "$(uname -m)" in \
+        x86_64) NODE_ARCH=x64 ;; \
+        aarch64|arm64) NODE_ARCH=arm64 ;; \
+        *) echo "unsupported arch: $(uname -m)"; exit 1 ;; \
+    esac; \
+    curl -fsSL --retry 3 --connect-timeout 20 \
+        "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" -o /tmp/node.tar.gz; \
+    mkdir -p /usr/local/lib/nodejs; \
+    tar -xzf /tmp/node.tar.gz -C /usr/local/lib/nodejs --strip-components=1; \
+    ln -sf /usr/local/lib/nodejs/bin/node /usr/local/bin/node; \
+    ln -sf /usr/local/lib/nodejs/bin/npm  /usr/local/bin/npm; \
+    ln -sf /usr/local/lib/nodejs/bin/npx  /usr/local/bin/npx; \
+    rm -f /tmp/node.tar.gz; \
+    node --version; \
+    npm config set prefix /usr/local; \
+    npm install -g "comfyui-mcp@${COMFYUI_MCP_VERSION}"; \
+    /usr/local/bin/comfyui-mcp --help >/dev/null 2>&1 || true
+
+COPY docker/supervisor-comfyui-mcp.conf /etc/supervisor/supervisord/conf.d/comfyui-mcp.conf
+COPY docker/supervisor-comfyui-mcp.sh /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
+RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
+
+# ---------------------------------------------------------------
 # 6. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
 # ---------------------------------------------------------------
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
@@ -159,14 +161,19 @@ COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 #    - COMFYUI_PORT_LOCAL: 容器内 ComfyUI 监听端口（必须 != COMFYUI_PORT_HOST，
 #      否则与 ai-dock 的 caddy 反向代理冲突）
 #    - WEB_PASSWORD / WEB_ENABLE_AUTH: ai-dock 的 caddy 认证（详见 README）
-#    - COMFY_LOCAL_URL: comfy-cli 连容器内 ComfyUI 的地址。ComfyUI 进程监听
-#      COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内 MCP 直连 18188
-#      可以完全绕过反代与认证。
+#    - COMFY_LOCAL_URL: comfy-cli / artokun MCP 连容器内 ComfyUI 的地址。
+#      ComfyUI 进程监听 COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内
+#      MCP 直连 18188 可以完全绕过反代与认证。
+#    - COMFYUI_MCP_PORT_LOCAL: 容器内 artokun MCP（Streamable HTTP）监听端口。
+#    - COMFYUI_MCP_HTTP_TOKEN: artokun MCP 的入站鉴权令牌（Bearer / X-API-Key）。
 # ---------------------------------------------------------------
 ENV COMFYUI_ARGS="--listen 0.0.0.0 --lowvram"
 ENV COMFYUI_PORT_LOCAL=18188
 ENV COMFYUI_PORT_HOST=8188
 ENV WEB_PASSWORD=comfy-h3
 ENV COMFY_LOCAL_URL=http://127.0.0.1:18188
+ENV COMFYUI_MCP_PORT_LOCAL=19100
+ENV COMFYUI_MCP_HTTP_TOKEN=comfy-h3-mcp
 
 EXPOSE 8188
+EXPOSE 19100
