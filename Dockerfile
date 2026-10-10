@@ -114,24 +114,66 @@ RUN bash -c "source /opt/environments/python/comfyui/bin/activate && \
         comfy --version && comfy-mcp --version"
 
 # ---------------------------------------------------------------
-# 5. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
+# 5. 安装 artokun/comfyui-mcp：第三方 ComfyUI MCP（让 Agent 直接搭建/编辑工作流
+#    并提供原生远程 HTTP），以 Node 运行，并作为容器内 supervisor 托管服务随容器启动。
+#    参考：https://github.com/artokun/comfyui-mcp（npm 包 comfyui-mcp）
+#    - 要求 Node >= 22：装官方 Node 22 的 linux tarball（.tar.gz，免 xz 依赖），
+#      再 `npm -g` 安装固定版本 comfyui-mcp。
+#    - 服务由 supervisord 拉起（docker/supervisor-comfyui-mcp.conf +
+#      docker/supervisor-comfyui-mcp.sh），日志写 /var/log/supervisor/comfyui-mcp.log；
+#      ai-dock 的 logtail 会把 /var/log/supervisor/*.log 汇总进 `docker logs`，
+#      因此 comfyui / caddy / comfyui-mcp 的日志在容器日志里都能看到。
+#    - 传输：Streamable HTTP，监听容器内 0.0.0.0:19100（由 compose 映射到宿主）。
+# ---------------------------------------------------------------
+ARG NODE_VERSION=v22.23.2
+ARG COMFYUI_MCP_VERSION=0.52.205
+RUN set -eux; \
+    case "$(uname -m)" in \
+        x86_64) NODE_ARCH=x64 ;; \
+        aarch64|arm64) NODE_ARCH=arm64 ;; \
+        *) echo "unsupported arch: $(uname -m)"; exit 1 ;; \
+    esac; \
+    curl -fsSL --retry 3 --connect-timeout 20 \
+        "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" -o /tmp/node.tar.gz; \
+    mkdir -p /usr/local/lib/nodejs; \
+    tar -xzf /tmp/node.tar.gz -C /usr/local/lib/nodejs --strip-components=1; \
+    ln -sf /usr/local/lib/nodejs/bin/node /usr/local/bin/node; \
+    ln -sf /usr/local/lib/nodejs/bin/npm  /usr/local/bin/npm; \
+    ln -sf /usr/local/lib/nodejs/bin/npx  /usr/local/bin/npx; \
+    rm -f /tmp/node.tar.gz; \
+    node --version; \
+    npm config set prefix /usr/local; \
+    npm install -g "comfyui-mcp@${COMFYUI_MCP_VERSION}"; \
+    /usr/local/bin/comfyui-mcp --help >/dev/null 2>&1 || true
+
+COPY docker/supervisor-comfyui-mcp.conf /etc/supervisor/supervisord/conf.d/comfyui-mcp.conf
+COPY docker/supervisor-comfyui-mcp.sh /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
+RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
+
+# ---------------------------------------------------------------
+# 6. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
 # ---------------------------------------------------------------
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 
 # ---------------------------------------------------------------
-# 6. 默认环境变量（可用 docker-compose / .env 覆盖）
+# 7. 默认环境变量（可用 docker-compose / .env 覆盖）
 #    - COMFYUI_ARGS: --lowvram 按需加载/卸载（12GB 显卡实测关键参数）
 #    - COMFYUI_PORT_LOCAL: 容器内 ComfyUI 监听端口（必须 != COMFYUI_PORT_HOST，
 #      否则与 ai-dock 的 caddy 反向代理冲突）
 #    - WEB_PASSWORD / WEB_ENABLE_AUTH: ai-dock 的 caddy 认证（详见 README）
-#    - COMFY_LOCAL_URL: comfy-cli 连容器内 ComfyUI 的地址。ComfyUI 进程监听
-#      COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内 MCP 直连 18188
-#      可以完全绕过反代与认证。
+#    - COMFY_LOCAL_URL: comfy-cli / artokun MCP 连容器内 ComfyUI 的地址。
+#      ComfyUI 进程监听 COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内
+#      MCP 直连 18188 可以完全绕过反代与认证。
+#    - COMFYUI_MCP_PORT_LOCAL: 容器内 artokun MCP（Streamable HTTP）监听端口。
+#    - COMFYUI_MCP_HTTP_TOKEN: artokun MCP 的入站鉴权令牌（Bearer / X-API-Key）。
 # ---------------------------------------------------------------
 ENV COMFYUI_ARGS="--listen 0.0.0.0 --lowvram"
 ENV COMFYUI_PORT_LOCAL=18188
 ENV COMFYUI_PORT_HOST=8188
 ENV WEB_PASSWORD=comfy-h3
 ENV COMFY_LOCAL_URL=http://127.0.0.1:18188
+ENV COMFYUI_MCP_PORT_LOCAL=19100
+ENV COMFYUI_MCP_HTTP_TOKEN=comfy-h3-mcp
 
 EXPOSE 8188
+EXPOSE 19100
