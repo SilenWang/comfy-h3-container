@@ -3,6 +3,8 @@
 # 子目录结构与 scripts/download_models.sh / scripts/download_models_extra.sh 保持一致：
 #   models/diffusion_models/  models/text_encoders/  models/vae/  models/loras/
 #   models/model_patches/（R2V 的动作控制补丁）  models/checkpoints/（SDPose 姿态提取）
+# checkpoints/ 同时放二次元生图的 SDXL 动漫底模（见 scripts/download_models_image.sh），
+# 两者都是单文件 checkpoint，ComfyUI 的 Load Checkpoint 节点里能一起看到。
 minimax_h3:
     diffusion_models: /workspace/models/diffusion_models
     text_encoders: /workspace/models/text_encoders
