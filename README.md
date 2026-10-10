@@ -11,7 +11,7 @@
 - **参考生视频（R2V）**：最多 9 张参考图 / 3 段参考视频 / 3 段参考音频，锁定人物长相、风格、动作、运镜、音色（多视角人物图防“长相抖动”就靠它）
 - **动作控制（Fun ControlNet Union）**：用姿态 / 深度 / 边缘 / HED / MLSD 控制视频驱动画面（内置 SDPose 从舞蹈视频提骨架），也支持 mask 局部重绘
 - **多帧参考（Multiframe Reference）**：在时间轴任意帧锚定参考图或音频
-- **输出高清化（SeedVR2 3B）**：自带的 H3 模板内置**可旁路**的放大/复原段，低清出片默认放大 2×（如 864×480 → 1728×960，720p/1080p 档；ComfyUI 内置节点，模型约 4GB，`pixi run models-upscaler-bg`）
+- **输出高清化（SeedVR2 3B）**：自带的 H3 模板内置**可旁路**的放大/复原段，低清出片默认放大 2×，再由链尾归一化统一输出**标准 1080p（1920×1080）**（ComfyUI 内置节点，模型约 4GB，`pixi run models-upscaler-bg`）
 - 12GB 显存实测可跑（int8 量化 + `--lowvram` + CPU offload）
 - Turbo 4 步 LoRA 加速（实测提速 ~4.4×）
 - **SageAttention 注意力加速**：两个 workflow 已内置 `PathchSageAttentionKJ` 节点（Ampere/Ada 约 1.3–2×，不改生成结果）
@@ -145,16 +145,31 @@ pixi run models-upscaler-status   # 查看进度
 
 **该段默认开启**，所以下完模型、重开一次工作流就能出高清成片：
 
-| 模板 | `ResolutionSelector` | 关掉放大时的出片 | 开启放大（2×，默认） |
-|---|---|---|---|
-| `minimax_h3_t2v_bund` / `minimax_h3_i2v` | 0.2 MP 16:9 | 608×352 | **1216×704** |
-| `minimax_h3_r2v` / `minimax_h3_fun_controlnet_union` / `minimax_h3_multiframe_reference` | 0.4 MP 16:9 | 864×480 | **1728×960** |
+| 模板 | `ResolutionSelector` | 关掉放大时的出片 | 开启放大（2×，默认） | 链尾 1080p 归一化（默认开启） |
+|---|---|---|---|---|
+| `minimax_h3_t2v_bund` / `minimax_h3_i2v` | 0.2 MP 16:9 | 608×352 | 1216×704 | **1920×1080** |
+| `minimax_h3_r2v` / `minimax_h3_fun_controlnet_union` / `minimax_h3_multiframe_reference` | 0.4 MP 16:9 | 864×480 | 1728×960 | **1920×1080** |
 
-三个开关（都在那段放大节点的左侧，节点标题已写明用途）：
+链尾的归一化只保证**成片尺寸**是标准 1080p，画面锐度由放大段的输入分辨率决定 —— 见下方「怎么拿到真正的 1080p」。
+
+四个开关（都在对应节点的左侧，节点标题已写明用途）：
 
 - **`Boolean (Enable HD Upscale)`**（默认 `true`）—— `true` 走放大段；`false` 直接旁路到原始解码图（快、省显存，分辨率回到上表第三列）。
-- **`Scale (HD multiplier)`**（`ResizeImageMaskNode`，默认 `2.0` + lanczos）—— 放大倍率。想要更高分辨率就调大（`2.5` / `3.0`，显存和耗时同步上升）；调回 `1.0` 相当于只让 SeedVR2 做修复不放大。想更精确地拿到 1080p，也可以改 `ResolutionSelector` 的 megapixels。
+- **`Scale (HD multiplier)`**（`ResizeImageMaskNode`，默认 `2.0` + lanczos）—— 放大倍率。想要更高分辨率就调大（`2.5` / `3.0`，显存和耗时同步上升）；调回 `1.0` 相当于只让 SeedVR2 做修复不放大。
 - **`Boolean (Split Latent)`**（默认 `true`）—— SeedVR2 的 latent 按显存分块采样再合并（`Split SeedVR2 Latent` 取 `auto`，按当前空闲显存预测块大小），12GB 显存建议保持开启；显存充足可关掉以省去分块开销。
+- **`Boolean (Force 1080p Output)`**（默认 `true`）—— 链尾 `Output 1080p (1920x1080)` 节点（`ResizeImageMaskNode`，`scale dimensions` + lanczos + 中心裁切）把成片统一归一化到精确 **1920×1080**。关掉即输出放大段的原始尺寸（1216×704 / 1728×960）。它只做一次缩放，不参与 SeedVR2 推理，几乎不增加耗时/显存。
+
+#### 怎么拿到真正的 1080p
+
+放大段是 **2×**，所以「高清化后」的原始结果并不是 1080p，而是下面的尺寸；链尾归一化再把它们落到 1920×1080 画布上。要让画面本身也达到 1080p 的锐度，把 `ResolutionSelector`（节点标题 `Resolution Selector (Size)`）的 **megapixels** 调大一档，让 2× 放大后本就在 1080p 附近：
+
+| `ResolutionSelector` megapixels | H3 本体出片（16:9） | 2× 放大后 | 归一化后 | 说明 |
+|---|---|---|---|---|
+| `0.2`（`t2v_bund` / `i2v` 默认） | 608×352 | 1216×704 | 1920×1080 | 最省显存，成片 1080p 但来自 1.58× 插值，偏软 |
+| `0.4`（其余 3 个模板默认） | 864×480 | 1728×960 | 1920×1080 | 只再插值 1.11×，1080p 锐度基本到位 |
+| `0.5` | 960×544 | 1920×1088 | 1920×1080 | 2× 后就是 1920×1088，归一化只是裁到 1080，最接近「原生 1080p」 |
+
+megapixels 每调大一档，H3 本体的生成耗时与显存都同步上升（`0.2 → 0.5` 像素量约 2.5×）；12GB 显存若吃力，优先把 `0.5` 退回 `0.4`，或保持 `Boolean (Split Latent)` 开启。
 
 参数沿用官方蓝图默认：`KSampler (SeedVR2, 1 step)`（steps 1 / cfg 1.0 / euler / simple / denoise 1.0，所以这一段额外耗时有限）、`color_correction_method = none`、`temporal_overlap = 8`（相邻分块交叉淡入淡出，抑制接缝闪烁）。
 

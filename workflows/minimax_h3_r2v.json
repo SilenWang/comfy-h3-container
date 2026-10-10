@@ -1,8 +1,8 @@
 {
   "id": "e3f2b845-8f2c-4b5a-9caf-eac1029d3e7e",
   "revision": 0,
-  "last_node_id": 163,
-  "last_link_id": 318,
+  "last_node_id": 166,
+  "last_link_id": 323,
   "nodes": [
     {
       "id": 92,
@@ -656,7 +656,7 @@
       "id": 130,
       "type": "CreateVideo",
       "pos": [
-        330,
+        760,
         5650
       ],
       "size": [
@@ -670,7 +670,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 318
+          "link": 322
         },
         {
           "name": "audio",
@@ -2040,7 +2040,8 @@
           "name": "output",
           "type": "*",
           "links": [
-            318
+            318,
+            321
           ]
         }
       ],
@@ -2111,6 +2112,134 @@
       "widgets_values": [
         "## HD 放大（SeedVR2 3B）— 可选，可旁路\n\n生成完的片段先按 **放大倍率** 用 lanczos 拉大，再交给 SeedVR2 3B（视频修复/放大模型）做细节复原，\n最后回贴原片音频 → 输出高清成片。\n\n- **要不要放大**：`Boolean (Enable HD Upscale)`，`false` = 完全跳过这段，直接出原始低清片。\n- **放大倍率**：`Scale (HD multiplier)`。608×352 出片 ×2 → 1216×704（≈720p）；\n  想要 1080p，建议先把 Resolution Selector 的 megapixels 提到 0.5（960×544）再 ×2 → 1920×1088，\n  比从 608×352 硬拉 3 倍更稳、更省显存。\n- **显存不够 / 片段长**：`Boolean (Split Latent)` 打开（默认开）。SeedVR2 会按剩余显存自动分块，\n  块间用 `Temporal overlap` 帧交叉淡化；12GB 卡上跑长片段需要开。\n- **色彩**：`Post-Process SeedVR2 Output` 的 color correction 默认 `none`（沿用官方蓝图）；\n  想让输出色调对齐放大前的参考帧，可改成 `lab`。\n- 模型：`models/diffusion_models/seedvr2_3b_int8_convrot.safetensors` +\n  `models/vae/seedvr2_ema_vae_fp16.safetensors`（约 4GB，`pixi run models-upscaler-bg`）。\n\n节点与模型都来自 ComfyUI 内置（0.39+ 的 `comfy_extras/nodes_seedvr.py`），无需额外自定义节点。"
       ]
+    },
+    {
+      "id": 164,
+      "type": "ResizeImageMaskNode",
+      "pos": [
+        1630.0,
+        6590.0
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 44,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "input",
+          "type": "IMAGE,MASK",
+          "link": 318
+        }
+      ],
+      "outputs": [
+        {
+          "name": "resized",
+          "type": "*",
+          "links": [
+            320
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ResizeImageMaskNode"
+      },
+      "widgets_values": [
+        "scale dimensions",
+        1920,
+        1080,
+        "center",
+        "lanczos"
+      ],
+      "title": "Output 1080p (1920x1080)"
+    },
+    {
+      "id": 165,
+      "type": "ComfySwitchNode",
+      "pos": [
+        1990.0,
+        6590.0
+      ],
+      "size": [
+        270,
+        86
+      ],
+      "flags": {},
+      "order": 45,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "*",
+          "link": 321
+        },
+        {
+          "name": "on_true",
+          "type": "*",
+          "link": 320
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 323
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "*",
+          "links": [
+            322
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "If/Else Switch (1080p output)"
+    },
+    {
+      "id": 166,
+      "type": "PrimitiveBoolean",
+      "pos": [
+        1990.0,
+        6740.0
+      ],
+      "size": [
+        270,
+        60
+      ],
+      "flags": {},
+      "order": 46,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BOOLEAN",
+          "type": "BOOLEAN",
+          "links": [
+            323
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "PrimitiveBoolean"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "Boolean (Force 1080p Output)"
     }
   ],
   "links": [
@@ -2582,9 +2711,41 @@
       318,
       161,
       0,
+      164,
+      0,
+      "IMAGE"
+    ],
+    [
+      320,
+      164,
+      0,
+      165,
+      1,
+      "IMAGE"
+    ],
+    [
+      321,
+      161,
+      0,
+      165,
+      0,
+      "IMAGE"
+    ],
+    [
+      322,
+      165,
+      0,
       130,
       0,
       "IMAGE"
+    ],
+    [
+      323,
+      166,
+      0,
+      165,
+      2,
+      "BOOLEAN"
     ]
   ],
   "groups": [
