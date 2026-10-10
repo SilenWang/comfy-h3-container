@@ -11,6 +11,7 @@
 - **参考生视频（R2V）**：最多 9 张参考图 / 3 段参考视频 / 3 段参考音频，锁定人物长相、风格、动作、运镜、音色（多视角人物图防“长相抖动”就靠它）
 - **动作控制（Fun ControlNet Union）**：用姿态 / 深度 / 边缘 / HED / MLSD 控制视频驱动画面（内置 SDPose 从舞蹈视频提骨架），也支持 mask 局部重绘
 - **多帧参考（Multiframe Reference）**：在时间轴任意帧锚定参考图或音频
+- **输出高清化（SeedVR2 3B）**：自带的 H3 模板内置**可旁路**的放大/复原段，低清出片默认放大 2×（如 864×480 → 1728×960，720p/1080p 档；ComfyUI 内置节点，模型约 4GB，`pixi run models-upscaler-bg`）
 - 12GB 显存实测可跑（int8 量化 + `--lowvram` + CPU offload）
 - Turbo 4 步 LoRA 加速（实测提速 ~4.4×）
 - **SageAttention 注意力加速**：两个 workflow 已内置 `PathchSageAttentionKJ` 节点（Ampere/Ada 约 1.3–2×，不改生成结果）
@@ -48,6 +49,8 @@ cp .env.example .env
 ./scripts/download_models.sh
 # 首次下载很慢（hf CDN 实测约 3–10MB/s，可能几小时），推荐改用后台方式：
 #   pixi run models-bg && pixi run models-status
+# 想输出 720p / 1080p 高清成片，再下约 4GB 的放大模型（见「输出高清化」）：
+#   pixi run models-upscaler-bg
 
 # 4. 构建并启动
 docker compose up -d --build
@@ -79,6 +82,13 @@ pixi run models-logs     # 实时跟踪 .build/models.log
 > pixi run models-extra-status    # 查看进度
 > ```
 > 切 HuggingFace 用 `pixi run models-extra-hf-bg` 或 `MODELS_SOURCE=hf pixi run models-extra-bg`。只在做 T2V/I2V 时不必下载这部分，见下文「更多参考方式」。
+
+> 想要**高清成片**（720p / 1080p），再下约 4GB 的 SeedVR2 放大模型：
+> ```bash
+> pixi run models-upscaler-bg       # 后台启动（默认魔搭，可断点续传）
+> pixi run models-upscaler-status   # 查看进度
+> ```
+> 切 HuggingFace 用 `pixi run models-upscaler-hf-bg`。这一套是工作流里「HD Upscale (SeedVR2 3B)」那一段用的，见下文「输出高清化」。
 
 ### 用外部模型目录（避免每次重新下载）
 
@@ -121,6 +131,34 @@ pixi run up             # 构建完成后启动容器（镜像已就绪，不再
 1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板
 2. 点 Queue 执行，等待输出（右侧 Video 面板可预览/下载）
 3. 输出文件同时保存在宿主的 `./output/` 目录
+
+### 输出高清化（HD Upscale，SeedVR2 3B）
+
+H3 本体以较低分辨率出片（分辨率越低速度越快、显存越省），所以自带模板另接了一段**可旁路**的 SeedVR2 放大 / 细节复原件，把成片再放大一档。它对应官方蓝图 `Upscale Video (SeedVR2 3B Int8)`，用的全是 ComfyUI 内置节点（`comfy_extras/nodes_seedvr.py`），不需要额外自定义节点。
+
+前置：先下约 4GB 的放大模型（落到 `models/diffusion_models/seedvr2_3b_int8_convrot.safetensors` 与 `models/vae/seedvr2_ema_vae_fp16.safetensors`）：
+
+```bash
+pixi run models-upscaler-bg       # 后台下载（默认魔搭，可断点续传）
+pixi run models-upscaler-status   # 查看进度
+```
+
+**该段默认开启**，所以下完模型、重开一次工作流就能出高清成片：
+
+| 模板 | `ResolutionSelector` | 关掉放大时的出片 | 开启放大（2×，默认） |
+|---|---|---|---|
+| `minimax_h3_t2v_bund` / `minimax_h3_i2v` | 0.2 MP 16:9 | 608×352 | **1216×704** |
+| `minimax_h3_r2v` / `minimax_h3_fun_controlnet_union` / `minimax_h3_multiframe_reference` | 0.4 MP 16:9 | 864×480 | **1728×960** |
+
+三个开关（都在那段放大节点的左侧，节点标题已写明用途）：
+
+- **`Boolean (Enable HD Upscale)`**（默认 `true`）—— `true` 走放大段；`false` 直接旁路到原始解码图（快、省显存，分辨率回到上表第三列）。
+- **`Scale (HD multiplier)`**（`ResizeImageMaskNode`，默认 `2.0` + lanczos）—— 放大倍率。想要更高分辨率就调大（`2.5` / `3.0`，显存和耗时同步上升）；调回 `1.0` 相当于只让 SeedVR2 做修复不放大。想更精确地拿到 1080p，也可以改 `ResolutionSelector` 的 megapixels。
+- **`Boolean (Split Latent)`**（默认 `true`）—— SeedVR2 的 latent 按显存分块采样再合并（`Split SeedVR2 Latent` 取 `auto`，按当前空闲显存预测块大小），12GB 显存建议保持开启；显存充足可关掉以省去分块开销。
+
+参数沿用官方蓝图默认：`KSampler (SeedVR2, 1 step)`（steps 1 / cfg 1.0 / euler / simple / denoise 1.0，所以这一段额外耗时有限）、`color_correction_method = none`、`temporal_overlap = 8`（相邻分块交叉淡入淡出，抑制接缝闪烁）。
+
+> **官方模板库里没有这段**：Template Library → Video 里的 H3 模板是纯净版，要高清成片请用仓库自带的这 5 个模板（容器启动即在 WebUI 的 Workflows 列表里）。反过来，已有视频想要高清化，也可以直接用官方 `Upscale Video (SeedVR2 3B Int8)` 蓝图单独跑一遍。
 
 ### 加速配置（两个自带 workflow 已调好）
 

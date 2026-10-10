@@ -1,8 +1,8 @@
 {
   "id": "e3f2b845-8f2c-4b5a-9caf-eac1029d3e7e",
   "revision": 0,
-  "last_node_id": 717,
-  "last_link_id": 1772,
+  "last_node_id": 734,
+  "last_link_id": 1799,
   "nodes": [
     {
       "id": 115,
@@ -219,7 +219,7 @@
       "flags": {
         "collapsed": false
       },
-      "order": 36,
+      "order": 41,
       "mode": 0,
       "inputs": [
         {
@@ -262,7 +262,7 @@
       "flags": {
         "collapsed": false
       },
-      "order": 35,
+      "order": 40,
       "mode": 0,
       "inputs": [
         {
@@ -281,7 +281,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            258
+            1773,
+            1797
           ]
         }
       ],
@@ -339,7 +340,7 @@
         130
       ],
       "flags": {},
-      "order": 32,
+      "order": 37,
       "mode": 0,
       "inputs": [
         {
@@ -393,7 +394,7 @@
         140
       ],
       "flags": {},
-      "order": 34,
+      "order": 39,
       "mode": 0,
       "inputs": [
         {
@@ -455,7 +456,7 @@
         60
       ],
       "flags": {},
-      "order": 33,
+      "order": 38,
       "mode": 0,
       "inputs": [
         {
@@ -627,13 +628,13 @@
         140
       ],
       "flags": {},
-      "order": 37,
+      "order": 54,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 258
+          "link": 1799
         },
         {
           "name": "audio",
@@ -681,7 +682,7 @@
       "flags": {
         "collapsed": true
       },
-      "order": 22,
+      "order": 27,
       "mode": 0,
       "inputs": [
         {
@@ -779,7 +780,7 @@
         340
       ],
       "flags": {},
-      "order": 26,
+      "order": 31,
       "mode": 0,
       "inputs": [
         {
@@ -976,7 +977,7 @@
         110
       ],
       "flags": {},
-      "order": 25,
+      "order": 30,
       "mode": 0,
       "inputs": [
         {
@@ -1034,7 +1035,7 @@
         110
       ],
       "flags": {},
-      "order": 23,
+      "order": 28,
       "mode": 0,
       "inputs": [
         {
@@ -1170,7 +1171,7 @@
         90
       ],
       "flags": {},
-      "order": 21,
+      "order": 26,
       "mode": 0,
       "inputs": [
         {
@@ -1261,7 +1262,7 @@
         210
       ],
       "flags": {},
-      "order": 31,
+      "order": 36,
       "mode": 0,
       "inputs": [
         {
@@ -1414,7 +1415,7 @@
         530
       ],
       "flags": {},
-      "order": 27,
+      "order": 32,
       "mode": 0,
       "inputs": [
         {
@@ -1536,7 +1537,7 @@
         270
       ],
       "flags": {},
-      "order": 29,
+      "order": 34,
       "mode": 0,
       "inputs": [
         {
@@ -1570,7 +1571,7 @@
         120
       ],
       "flags": {},
-      "order": 24,
+      "order": 29,
       "mode": 0,
       "inputs": [
         {
@@ -1615,7 +1616,7 @@
         126
       ],
       "flags": {},
-      "order": 38,
+      "order": 55,
       "mode": 0,
       "inputs": [
         {
@@ -1683,7 +1684,7 @@
         120
       ],
       "flags": {},
-      "order": 28,
+      "order": 33,
       "mode": 4,
       "inputs": [
         {
@@ -1737,7 +1738,7 @@
         80
       ],
       "flags": {},
-      "order": 30,
+      "order": 35,
       "mode": 4,
       "inputs": [
         {
@@ -1857,6 +1858,741 @@
       },
       "color": "#222",
       "bgcolor": "#000"
+    },
+    {
+      "id": 718,
+      "type": "ResizeImageMaskNode",
+      "pos": [
+        510.0,
+        5990.0
+      ],
+      "size": [
+        270,
+        90
+      ],
+      "flags": {},
+      "order": 42,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "input",
+          "type": "IMAGE,MASK",
+          "link": 1773
+        }
+      ],
+      "outputs": [
+        {
+          "name": "resized",
+          "type": "*",
+          "links": [
+            1774,
+            1775
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ResizeImageMaskNode"
+      },
+      "widgets_values": [
+        "scale by multiplier",
+        2.0,
+        "lanczos"
+      ],
+      "title": "Scale (HD multiplier)"
+    },
+    {
+      "id": 719,
+      "type": "UNETLoader",
+      "pos": [
+        510.0,
+        6440.0
+      ],
+      "size": [
+        330,
+        60
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1783,
+            1784
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "seedvr2_3b_int8_convrot.safetensors",
+        "default"
+      ],
+      "title": "Load SeedVR2 3B (int8)"
+    },
+    {
+      "id": 720,
+      "type": "VAELoader",
+      "pos": [
+        510.0,
+        6590.0
+      ],
+      "size": [
+        330,
+        60
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            1777,
+            1794
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "seedvr2_ema_vae_fp16.safetensors"
+      ],
+      "title": "Load SeedVR2 VAE"
+    },
+    {
+      "id": 721,
+      "type": "SeedVR2Preprocess",
+      "pos": [
+        810.0,
+        5990.0
+      ],
+      "size": [
+        270,
+        40
+      ],
+      "flags": {},
+      "order": 43,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "resized_images",
+          "type": "IMAGE",
+          "link": 1774
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            1776
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SeedVR2Preprocess"
+      },
+      "title": "Pre-Process SeedVR2 Input"
+    },
+    {
+      "id": 722,
+      "type": "VAEEncodeTiled",
+      "pos": [
+        810.0,
+        6290.0
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 44,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 1776
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 1777
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            1778,
+            1779
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "VAEEncodeTiled"
+      },
+      "widgets_values": [
+        512,
+        128,
+        64,
+        8
+      ]
+    },
+    {
+      "id": 723,
+      "type": "SeedVR2TemporalChunk",
+      "pos": [
+        810.0,
+        6590.0
+      ],
+      "size": [
+        270,
+        100
+      ],
+      "flags": {},
+      "order": 45,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "link": 1778
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "links": [
+            1780
+          ]
+        },
+        {
+          "name": "temporal_overlap",
+          "type": "INT",
+          "links": [
+            1789
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SeedVR2TemporalChunk"
+      },
+      "widgets_values": [
+        8,
+        "auto"
+      ],
+      "title": "Split SeedVR2 Latent (auto)"
+    },
+    {
+      "id": 724,
+      "type": "SeedVR2Conditioning",
+      "pos": [
+        1110.0,
+        5990.0
+      ],
+      "size": [
+        270,
+        70
+      ],
+      "flags": {},
+      "order": 47,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1783
+        },
+        {
+          "name": "vae_conditioning",
+          "type": "LATENT",
+          "link": 1782
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            1785
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            1786
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SeedVR2Conditioning"
+      }
+    },
+    {
+      "id": 725,
+      "type": "KSampler",
+      "pos": [
+        1110.0,
+        6290.0
+      ],
+      "size": [
+        310,
+        260
+      ],
+      "flags": {},
+      "order": 48,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1784
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 1785
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 1786
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 1787
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            1788,
+            1790
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        959948902156062,
+        "fixed",
+        1,
+        1,
+        "euler",
+        "simple",
+        1
+      ],
+      "title": "KSampler (SeedVR2, 1 step)"
+    },
+    {
+      "id": 726,
+      "type": "SeedVR2TemporalMerge",
+      "pos": [
+        1110.0,
+        6590.0
+      ],
+      "size": [
+        270,
+        90
+      ],
+      "flags": {},
+      "order": 49,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 1790
+        },
+        {
+          "name": "temporal_overlap",
+          "type": "INT",
+          "link": 1789
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            1791
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SeedVR2TemporalMerge"
+      },
+      "title": "Merge SeedVR2 Latents"
+    },
+    {
+      "id": 727,
+      "type": "ComfySwitchNode",
+      "pos": [
+        1410.0,
+        5990.0
+      ],
+      "size": [
+        270,
+        70
+      ],
+      "flags": {},
+      "order": 46,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "*",
+          "link": 1779
+        },
+        {
+          "name": "on_true",
+          "type": "*",
+          "link": 1780
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 1781
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "*",
+          "links": [
+            1782,
+            1787
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "If/Else Switch (split latent)"
+    },
+    {
+      "id": 728,
+      "type": "PrimitiveBoolean",
+      "pos": [
+        1410.0,
+        6140.0
+      ],
+      "size": [
+        270,
+        60
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BOOLEAN",
+          "type": "BOOLEAN",
+          "links": [
+            1781,
+            1792
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "PrimitiveBoolean"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "Boolean (Split Latent)"
+    },
+    {
+      "id": 729,
+      "type": "ComfySwitchNode",
+      "pos": [
+        1410.0,
+        6440.0
+      ],
+      "size": [
+        270,
+        70
+      ],
+      "flags": {},
+      "order": 50,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "*",
+          "link": 1788
+        },
+        {
+          "name": "on_true",
+          "type": "*",
+          "link": 1791
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 1792
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "*",
+          "links": [
+            1793
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "If/Else Switch (merge latent)"
+    },
+    {
+      "id": 730,
+      "type": "VAEDecodeTiled",
+      "pos": [
+        1710.0,
+        5990.0
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 1793
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 1794
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1795
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "VAEDecodeTiled"
+      },
+      "widgets_values": [
+        512,
+        128,
+        64,
+        8
+      ]
+    },
+    {
+      "id": 731,
+      "type": "SeedVR2PostProcessing",
+      "pos": [
+        1710.0,
+        6290.0
+      ],
+      "size": [
+        270,
+        100
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 1795
+        },
+        {
+          "name": "original_resized_images",
+          "type": "IMAGE",
+          "link": 1775
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            1796
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SeedVR2PostProcessing"
+      },
+      "widgets_values": [
+        "none"
+      ],
+      "title": "Post-Process SeedVR2 Output"
+    },
+    {
+      "id": 732,
+      "type": "ComfySwitchNode",
+      "pos": [
+        1710.0,
+        6590.0
+      ],
+      "size": [
+        270,
+        70
+      ],
+      "flags": {},
+      "order": 53,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "*",
+          "link": 1797
+        },
+        {
+          "name": "on_true",
+          "type": "*",
+          "link": 1796
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 1798
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "*",
+          "links": [
+            1799
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "If/Else Switch (HD upscale)"
+    },
+    {
+      "id": 733,
+      "type": "PrimitiveBoolean",
+      "pos": [
+        1710.0,
+        6740.0
+      ],
+      "size": [
+        270,
+        60
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BOOLEAN",
+          "type": "BOOLEAN",
+          "links": [
+            1798
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "PrimitiveBoolean"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "Boolean (Enable HD Upscale)"
+    },
+    {
+      "id": 734,
+      "type": "MarkdownNote",
+      "pos": [
+        2010.0,
+        5990.0
+      ],
+      "size": [
+        430,
+        700
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Note: HD Upscale (SeedVR2 3B)",
+      "properties": {},
+      "color": "#222",
+      "bgcolor": "#000",
+      "widgets_values": [
+        "## HD 放大（SeedVR2 3B）— 可选，可旁路\n\n生成完的片段先按 **放大倍率** 用 lanczos 拉大，再交给 SeedVR2 3B（视频修复/放大模型）做细节复原，\n最后回贴原片音频 → 输出高清成片。\n\n- **要不要放大**：`Boolean (Enable HD Upscale)`，`false` = 完全跳过这段，直接出原始低清片。\n- **放大倍率**：`Scale (HD multiplier)`。608×352 出片 ×2 → 1216×704（≈720p）；\n  想要 1080p，建议先把 Resolution Selector 的 megapixels 提到 0.5（960×544）再 ×2 → 1920×1088，\n  比从 608×352 硬拉 3 倍更稳、更省显存。\n- **显存不够 / 片段长**：`Boolean (Split Latent)` 打开（默认开）。SeedVR2 会按剩余显存自动分块，\n  块间用 `Temporal overlap` 帧交叉淡化；12GB 卡上跑长片段需要开。\n- **色彩**：`Post-Process SeedVR2 Output` 的 color correction 默认 `none`（沿用官方蓝图）；\n  想让输出色调对齐放大前的参考帧，可改成 `lab`。\n- 模型：`models/diffusion_models/seedvr2_3b_int8_convrot.safetensors` +\n  `models/vae/seedvr2_ema_vae_fp16.safetensors`（约 4GB，`pixi run models-upscaler-bg`）。\n\n节点与模型都来自 ComfyUI 内置（0.39+ 的 `comfy_extras/nodes_seedvr.py`），无需额外自定义节点。"
+      ]
     }
   ],
   "links": [
@@ -1907,14 +2643,6 @@
       125,
       3,
       "SIGMAS"
-    ],
-    [
-      258,
-      122,
-      0,
-      130,
-      0,
-      "IMAGE"
     ],
     [
       259,
@@ -2179,6 +2907,222 @@
       709,
       0,
       "VIDEO"
+    ],
+    [
+      1773,
+      122,
+      0,
+      718,
+      0,
+      "IMAGE"
+    ],
+    [
+      1774,
+      718,
+      0,
+      721,
+      0,
+      "IMAGE"
+    ],
+    [
+      1775,
+      718,
+      0,
+      731,
+      1,
+      "IMAGE"
+    ],
+    [
+      1776,
+      721,
+      0,
+      722,
+      0,
+      "IMAGE"
+    ],
+    [
+      1777,
+      720,
+      0,
+      722,
+      1,
+      "VAE"
+    ],
+    [
+      1778,
+      722,
+      0,
+      723,
+      0,
+      "LATENT"
+    ],
+    [
+      1779,
+      722,
+      0,
+      727,
+      0,
+      "LATENT"
+    ],
+    [
+      1780,
+      723,
+      0,
+      727,
+      1,
+      "LATENT"
+    ],
+    [
+      1781,
+      728,
+      0,
+      727,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      1782,
+      727,
+      0,
+      724,
+      1,
+      "LATENT"
+    ],
+    [
+      1783,
+      719,
+      0,
+      724,
+      0,
+      "MODEL"
+    ],
+    [
+      1784,
+      719,
+      0,
+      725,
+      0,
+      "MODEL"
+    ],
+    [
+      1785,
+      724,
+      0,
+      725,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      1786,
+      724,
+      1,
+      725,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      1787,
+      727,
+      0,
+      725,
+      3,
+      "LATENT"
+    ],
+    [
+      1788,
+      725,
+      0,
+      729,
+      0,
+      "LATENT"
+    ],
+    [
+      1789,
+      723,
+      1,
+      726,
+      1,
+      "INT"
+    ],
+    [
+      1790,
+      725,
+      0,
+      726,
+      0,
+      "LATENT"
+    ],
+    [
+      1791,
+      726,
+      0,
+      729,
+      1,
+      "LATENT"
+    ],
+    [
+      1792,
+      728,
+      0,
+      729,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      1793,
+      729,
+      0,
+      730,
+      0,
+      "LATENT"
+    ],
+    [
+      1794,
+      720,
+      0,
+      730,
+      1,
+      "VAE"
+    ],
+    [
+      1795,
+      730,
+      0,
+      731,
+      0,
+      "IMAGE"
+    ],
+    [
+      1796,
+      731,
+      0,
+      732,
+      1,
+      "IMAGE"
+    ],
+    [
+      1797,
+      122,
+      0,
+      732,
+      0,
+      "IMAGE"
+    ],
+    [
+      1798,
+      733,
+      0,
+      732,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      1799,
+      732,
+      0,
+      130,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [
@@ -2288,6 +3232,18 @@
         340
       ],
       "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 10,
+      "title": "HD Upscale (SeedVR2 3B) — 可选，可旁路",
+      "bounding": [
+        480.0,
+        5910.0,
+        2010,
+        2020
+      ],
+      "color": "#a1309b",
       "flags": {}
     }
   ],

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # 查看后台模型下载（scripts/download_models_bg.sh）的状态、进度与日志尾部。
 #
-#   ./scripts/models_status.sh          # 基础模型（默认）
-#   ./scripts/models_status.sh extra    # 参考/控制模型
+#   ./scripts/models_status.sh             # 基础模型（默认）
+#   ./scripts/models_status.sh extra       # 参考/控制模型
+#   ./scripts/models_status.sh upscaler    # SeedVR2 放大模型
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,8 +19,13 @@ case "${1:-base}" in
     PIDF="$ROOT/.build/models_extra.pid"
     LABEL="参考/控制模型"
     ;;
+  upscaler)
+    LOG="$ROOT/.build/models_upscaler.log"
+    PIDF="$ROOT/.build/models_upscaler.pid"
+    LABEL="SeedVR2 放大模型"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | upscaler）" >&2
     exit 2
     ;;
 esac
