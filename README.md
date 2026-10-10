@@ -127,7 +127,7 @@ pixi run up             # 构建完成后启动容器（镜像已就绪，不再
 仓库里的 `workflows/minimax_h3_t2v_bund.json` 与 `workflows/minimax_h3_i2v.json` 就是实测的 12GB 配置，容器启动即出现在 WebUI 的 Workflows 列表，已包含：
 
 - `MiniMaxH3TurboLoRA`（`minimax_h3_turbo_v4_step600_ema.safetensors`，4 步）+ `MiniMaxH3TurboSampler`
-- `PathchSageAttentionKJ`（ComfyUI-KJNodes）—— 注意力加速，模式默认 `sageattn_qk_int8_pv_fp16_cuda`、`allow_compile` 关闭。这是唯一"不改结果"的提速手段（Ampere/Ada 约 1.3–2×）；镜像构建期会从源码编译官方 SageAttention v2.2.0，若构建失败把模式切到 `auto`（V1 Triton）或 `disabled` 即可无损回退
+- `PathchSageAttentionKJ`（ComfyUI-KJNodes）—— 注意力加速，模式默认 `sageattn_qk_int8_pv_fp16_cuda`、`allow_compile` 关闭。这是唯一"不改结果"的提速手段（Ampere/Ada 约 1.3–2×）；镜像构建期会从源码编译官方 SageAttention v2.2.0，若构建失败把模式切到 `auto`（V1 Triton）或 `disabled` 即可无损回退。既有容器若报 `No module named 'sageattention'`，直接 `pixi run fix-sage-attn` 现场补装即可，无需重建镜像（见「故障排查」）
 - `H3EvictTextEncoder`（ComfyUI-MAINodes）—— conditioning 直通节点，编码完成后立即卸载 Qwen3-VL 文本编码器，必须位于 `BasicGuider` 之前
 - `BasicScheduler` 步数 **4** + 容器参数 `--lowvram`
 
@@ -312,7 +312,7 @@ models/
 
 更高分辨率（1344×768 原生画布 / 5s）参考社区实测约 7 分钟/段（Turbo 4 步）。
 
-> 注意：`SageAttention` 只在 Ampere/Ada 及以后有收益（**RTX 30/40 系约 1.3–2×，Blackwell 较小**）；`H3EvictTextEncoder` 在 `--gpu-only` 模式下是 no-op。若 SageAttention 构建失败，把 `PathchSageAttentionKJ` 切到 `auto`（V1 Triton）或 `disabled` 即可无损回退。
+> 注意：`SageAttention` 只在 Ampere/Ada 及以后有收益（**RTX 30/40 系约 1.3–2×，Blackwell 较小**）；`H3EvictTextEncoder` 在 `--gpu-only` 模式下是 no-op。若 SageAttention 构建失败，把 `PathchSageAttentionKJ` 切到 `auto`（V1 Triton）或 `disabled` 即可无损回退；既有容器缺失时用 `pixi run fix-sage-attn` 现场补装。
 
 ## 已知限制
 
@@ -323,12 +323,37 @@ models/
 5. **ComfyUI-Copilot 对 H3 的知识有限**：官方托管 API 已停服、必须自备 LLM Key，且其工作流知识库基本不认识 H3/Turbo 专用节点，更适合"生成骨架 + 手工接线"，不是拿来即用的 H3 工作流生成器
 6. Copilot 的 `requirements.txt` 会往 ComfyUI 的 Python 环境里引入一批新依赖（`sqlalchemy<2.0`、`openai`、`langsmith`、`modelscope`、`fastmcp` 等），其中 `urllib3>=1.26,<2.0` 可能覆盖上游版本。若与已有插件冲突，可移除 `pip install` 那一步或改装到独立环境
 7. Comfy MCP Local 的 `launch_comfyui` / 停止 / 日志类工具语义受限：ComfyUI 在容器内由 ai-dock 启动，comfy-cli 再 `launch` 会另起一个进程。日常用 `run_workflow` / `server_info` / `fetch_outputs` 不受影响
-8. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟）。构建脚本对安装失败做了容错，此时把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退
+8. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 codeload tarball 拉源码，ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟），并先装 PyPI V1 兜底、编译后校验 import，避免"构建成功却漏装"。万一构建失败，把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退；既有容器可 `pixi run fix-sage-attn` 现场补装
 9. 自带 workflow **不再内置 EasyCache**：4 步配置下其收益有限且后段可能起颗粒。需要时自行叠加默认参数的 `EasyCache`，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上
 10. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
 11. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
 12. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
 13. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
+
+## 故障排查
+
+### `PathchSageAttentionKJ` 报 `ModuleNotFoundError: No module named 'sageattention'`
+
+**现象**：执行 i2v/t2v 工作流时，节点 137（`PathchSageAttentionKJ`）抛出 `ModuleNotFoundError`，日志里前面有 `Using sage attention mode: sageattn_qk_int8_pv_fp16_cuda`。
+
+**根因**：镜像构建期的 SageAttention 源码安装失败，但被 `|| echo WARN` 容错吞掉，于是镜像"构建成功"却漏装了 `sageattention`（旧版 Dockerfile 用 `git clone` 拉源码，部分构建机会卡在 index-pack / 超时失败）。确认方式：
+
+```bash
+docker exec comfyui-h3 /opt/environments/python/comfyui/bin/pip show sageattention
+```
+
+**修复（无需重建镜像，推荐）**：在运行中的容器里现场编译安装 SageAttention v2.2.0：
+
+```bash
+pixi run fix-sage-attn                  # 等价于 bash scripts/install_sageattention.sh
+# 自定义容器名：./scripts/install_sageattention.sh <容器名>
+```
+
+KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，直接在 WebUI 重新 Queue 即可。
+
+**兜底**：若暂时不想编译，可把 `PathchSageAttentionKJ` 的 `sage_attention` 模式从 `sageattn_qk_int8_pv_fp16_cuda` 改成 `auto`（需先 `pip install sageattention` 装 V1）或 `disabled`，工作流仍可跑通，只是失去注意力加速。
+
+> 现版本 Dockerfile 已改用 codeload tarball + 重试来拉源码，并先装 PyPI V1 兜底、编译后校验 import，不会再出现"构建成功却漏装"的静默失败。
 
 ## 参考项目与致谢
 
