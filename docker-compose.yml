@@ -7,10 +7,10 @@
 #   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
-# AI 辅助（镜像内已装好）：
-#   Comfy MCP Local  容器内 stdio server，客户端配置见 `pixi run mcp-config`
-#                    远程 HTTP（Streamable HTTP / SSE）见 `pixi run mcp-http`，
-#                    或 ./scripts/mcp_client_config.sh http
+# AI 辅助（镜像内已装好官方 Comfy MCP Local）：
+#   Comfy MCP Local   容器内 stdio server，客户端配置见 `pixi run mcp-config`（默认容器模式）
+#   artokun/comfyui-mcp  宿主侧跑、能让 Agent 直接搭建/编辑工作流，见 `pixi run mcp-config artokun`
+#                    远程 Streamable HTTP：`pixi run mcp-artokun-http`（`... artokun-http` 打印配置）
 services:
   comfyui:
     build: .
@@ -21,6 +21,10 @@ services:
     gpus: all
     ports:
       - "8188:8188"
+      # 容器内 ComfyUI 直连端口（18188）映射到宿主 localhost：供宿主侧 artokun MCP
+      # 直连，绕过 8188 上的 caddy 认证（因此与 WEB_ENABLE_AUTH 无关）。
+      # 仅绑定 127.0.0.1，不对局域网/公网暴露。
+      - "127.0.0.1:18188:18188"
     environment:
       # WebUI 认证：由 ai-dock 基础镜像内置的 caddy 反向代理提供，
       # 不是 ComfyUI 自带功能，也非必须。局域网自用可在 .env 里关闭：

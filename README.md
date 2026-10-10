@@ -17,7 +17,7 @@
 - **文本编码器显式卸载**：内置 `H3EvictTextEncoder`，编码后立即释放 15.7GB 的 Qwen3-VL，避免采样阶段反复经 PCIe 换入换出
 - WebUI + REST API（ComfyUI 原生）
 - 内置 [Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)：在 Claude Code / Cursor 里用自然语言驱动本地 ComfyUI（容器内 stdio server）
-- 支持把该 MCP 网桥成**远程 HTTP**（Streamable HTTP，或旧版 HTTP+SSE）：其它机器 / 客户端无需 docker / pixi，直接连 URL 即可（`pixi run mcp-http`）
+- 集成 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**，并支持**远程 Streamable HTTP**（`pixi run mcp-artokun` / `mcp-artokun-http`）
 - WebUI 认证可一键关闭（局域网自用、免每次输密码）
 - 模型一键下载脚本（断点续传）
 
@@ -57,7 +57,7 @@ docker compose up -d --build
 
 启动完成后访问 http://localhost:8188。默认 `.env.example` 已关闭认证，**直接进入、无需输密码**；若 `WEB_ENABLE_AUTH=true`，则账号固定为 `user`、密码为 `.env` 中的 `WEB_PASSWORD`。
 
-> 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `models-bg` / `mcp-config` / `mcp-http`（远程 MCP）。只用原生 `docker compose` 也完全可以。
+> 可选：仓库带 `pixi.toml`，常用命令可走统一入口——`pixi run up` / `down` / `logs` / `models` / `models-bg` / `mcp-config` / `mcp-artokun`（工作流 MCP）。只用原生 `docker compose` 也完全可以。
 
 ### 模型下载（可能几小时，支持断点续传）
 
@@ -177,11 +177,12 @@ CLIPLoader ──→ MiniMaxH3ImageToVideo.clip
 
 ## AI 辅助：用 MCP 驱动 ComfyUI（本地 / 远程）
 
-镜像内置 [官方 comfy-mcp](https://github.com/Comfy-Org/comfy-mcp)——一个基于 `comfy-cli` 的 stdio MCP server。它能查询容器里**真实安装的节点、模型和模板**（含 H3 与 Turbo 专用节点），比通用知识库可靠；每个工具都 shell out 到 `comfy --json`。
+仓库接了两套 MCP，分工不同、可并存：
 
-提供三种接入方式：**容器内 stdio**（本地用，推荐）、**宿主 stdio**（可选）、**远程 HTTP**（跨机器；把 stdio 网桥成 HTTP）。
+- **[官方 comfy-mcp](https://github.com/Comfy-Org/comfy-mcp)**（容器内 stdio）：基于 `comfy-cli`，强于**跑工作流 + 填模板槽位 + 查询容器里真实安装的节点/模型**，工具语义官方稳定。
+- **[artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)**（宿主侧）：第三方，强于**让 Agent 直接搭建 / 编辑 / 校验工作流**，并**原生支持远程 HTTP**。想让 Agent 帮你**预配置工作流**就用它。
 
-### 1. Comfy MCP Local — 容器内 stdio（本地，推荐）
+### 1. 官方 Comfy MCP Local — 容器内 stdio（跑现成工作流，推荐）
 
 [官方 comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) 是 stdio MCP server，引擎是 `comfy-cli`。本镜像把它**装在容器内**，并已把 comfy-cli 的 workspace 指向 `/opt/ComfyUI`，所以开箱即用。
 
@@ -212,7 +213,7 @@ claude mcp add comfy-mcp -- docker exec -i comfyui-h3 comfy-mcp
 > `docker exec comfyui-h3 comfy set-default /opt/ComfyUI`。
 
 <details>
-<summary>备选：把 MCP server 跑在宿主机上（需要额外准备）</summary>
+<summary>备选：把官方 MCP server 跑在宿主机上（需要额外准备）</summary>
 
 仓库自带 `pixi` 环境，也可以在宿主直接跑：
 
@@ -225,67 +226,61 @@ pixi run mcp-config host      # 打印带绝对路径的客户端配置
 
 </details>
 
-### 2. 远程 HTTP / SSE（跨机器、无需 docker / pixi）
+### 2. artokun/comfyui-mcp（让 Agent 直接搭 / 改工作流 + 远程 HTTP）
 
-官方 comfy-mcp **只有 stdio**：客户端必须把 server 当子进程拉起，所以没法直接从另一台机器连它。本仓库用 [supergateway](https://github.com/supercorp-ai/supergateway) 在**宿主侧**起一个 HTTP 网关，网关再通过 `docker exec -i comfyui-h3 comfy-mcp` 拉起容器里的 stdio server，把它转换成远程可连的 MCP 端点。任何支持远程传输的 MCP 客户端直接连 URL 即可，无需 docker、无需 pixi。
+官方 comfy-mcp 偏「执行 + 模板 + 自省」，**不能从零搭图**。若你想让 Agent **帮你预配置 / 编辑工作流**，用第三方的 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)（npm 包 `comfyui-mcp`）：它能 `create_workflow`（从模板或从零建节点 / 连线 / 设参）、`modify`（增删改连）、`validate`（运行前校验）、`get_workflow` / `save_workflow`（读 / 存工作流库），还带模型家族 skills（含 **MiniMax H3**），并**原生支持远程 Streamable HTTP**。
 
-两种传输任选：
+本仓库把它放在**宿主侧**跑（`pixi` 管理 Node 22），经 `COMFYUI_URL` 驱动容器内 ComfyUI。为此 `docker-compose.yml` 已把容器内 ComfyUI 端口 `18188` 映射到宿主 `127.0.0.1:18188`，MCP 直连它、**绕过 8188 上的 caddy 认证**（与 `WEB_ENABLE_AUTH` 无关）。
 
-- **Streamable HTTP**（MCP `2025-03-26` 起的现行标准；POST + 可选 SSE，端点 `/mcp`）——**推荐**
-- **HTTP+SSE**（旧版 `2024-11-05`，端点 `/sse` + POST `/message`）——仅当客户端不支持前者时用
-
-启动网关（前台长驻进程；建议放进 systemd / tmux / screen 常驻）：
+**本地 stdio**（Claude Code / Cursor）：
 
 ```bash
-pixi run mcp-http     # Streamable HTTP → http://<宿主机IP>:8765/mcp
-pixi run mcp-sse      # 旧版 SSE        → http://<宿主机IP>:8765/sse
+pixi install                 # 装 pixi 管理的 Node 22
+pixi run mcp-config artokun  # 打印客户端配置（经 pixi 启动，保证用对的 Node）
 ```
 
-客户端配置（`pixi run mcp-config http` / `pixi run mcp-config sse` 可随时打印）：
+**远程 Streamable HTTP**（其它机器 / 客户端）：
+
+```bash
+# 绑非回环地址必须带鉴权令牌（artokun 会拒绝无鉴权的公网暴露）
+MCP_HTTP_HOST=0.0.0.0 COMFYUI_MCP_HTTP_TOKEN=$(openssl rand -hex 16) pixi run mcp-artokun-http
+pixi run mcp-config artokun-http   # 打印带 token 的客户端配置
+```
+
+客户端（Claude Desktop / Cursor）：
 
 ```jsonc
-// Claude Desktop / Cursor
 {
   "mcpServers": {
-    "comfy-mcp": { "type": "http", "url": "http://<宿主机IP>:8765/mcp" }
+    "comfyui": {
+      "type": "http",
+      "url": "http://<宿主机IP>:9100/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
   }
 }
-```
-
-```bash
-# Claude Code
-claude mcp add --transport http comfy-mcp http://<宿主机IP>:8765/mcp
 ```
 
 可配置项（宿主环境变量）：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `MCP_HTTP_TRANSPORT` | `streamableHttp` | `streamableHttp` 或 `sse` |
-| `MCP_HTTP_HOST` | `0.0.0.0` | 监听地址；只本机用可设 `127.0.0.1` |
-| `MCP_HTTP_PORT` | `8765` | 监听端口 |
-| `MCP_HTTP_PUBLIC_HOST` | 自动探测本机 IP | 打印客户端配置时的对外地址 |
-| `COMFY_CONTAINER_NAME` | `comfyui-h3` | 上游容器名 |
-| `SUPERGATEWAY_VERSION` | `4.1.0` | 网桥版本 |
+| `COMFYUI_URL` | `http://127.0.0.1:18188` | 目标 ComfyUI（容器内直连端口，绕过 caddy） |
+| `COMFYUI_MCP_VERSION` | `0.52.205` | 固定的 npm 包版本 |
+| `MCP_HTTP_HOST` / `MCP_HTTP_PORT` | `127.0.0.1` / `9100` | 远程模式监听地址 / 端口 |
+| `COMFYUI_MCP_HTTP_TOKEN` | 空 | 远程模式入站令牌（绑非回环必须设） |
+| `COMFYUI_PATH` | 空 | 可选：本机 ComfyUI 目录，供模型 / 输出等本地文件类工具 |
 
-> ⚠️ **网关没有内置鉴权**：supergateway 4.1.x 不提供入站认证，任何能访问该端口的人都能驱动本机 ComfyUI（跑工作流、读输出）。仅在可信局域网使用；要跨网络请放在带 TLS + 鉴权的反向代理（caddy / nginx）后，或走 Tailscale / WireGuard 等私有网络，并把端口限制来源网段。
+> ⚠️ **第三方 + 有限维护**：`artokun/comfyui-mcp` 是社区实现（MIT / Node ≥22），README 标注 limited maintenance，工具面与官方 comfy-cli **不通用**；H3 的 `MiniMaxH3TurboLoRA` / `PathchSageAttentionKJ` / `H3EvictTextEncoder` 这套专用链它也不认识，但能读容器里**实际安装**的 `/object_info`。最稳的用法是把仓库现成的 `workflows/*.json` 当模板喂给 Agent，让它在此基础上改参 / 接线。
 >
-> 网关是**宿主机上的长驻进程**：容器重启不影响它；宿主机或终端重启后要重新拉起（需常驻可自行写 systemd unit）。上游容器未运行时网关启动会报错退出（先 `pixi run up`）。
+> **安全**：远程模式务必设 `COMFYUI_MCP_HTTP_TOKEN`；跨公网再叠加 TLS / 私有网络。
+> **常驻**：`mcp-artokun-http` 是前台长驻进程，需常驻可自行写 systemd unit（容器重启不影响它）。
 
 <details>
-<summary>选型备选（为什么用 supergateway，而不是别的网桥）</summary>
+<summary>与官方 comfy-mcp 的分工（两套可并存）</summary>
 
-把 stdio MCP 转成 HTTP 的选项不止一个，本项目选 supergateway 的理由：
-
-| 方案 | 形态 | 说明 |
-|---|---|---|
-| **supergateway**（本项目采用） | Node | stdio→Streamable HTTP **或** SSE 都能给；单命令、无 mcp Python SDK 依赖，不会和容器内的 comfy-mcp 冲突。用 `pixi` 管理的 Node 跑，版本可固定。 |
-| [mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) | Python | 同样能 stdio↔HTTP。**注意**：PyPI 最新 `0.12.0` 只声明 `mcp>=1.17.0` 却用了 `mcp<2` 的 API，遇到 `mcp` SDK 2.x 会 `ImportError: cannot import name 'request_ctx'`；而官方 comfy-mcp 要求 `mcp>=2`。二者在同一环境里冲突，需单独隔离环境并锁 `mcp<2`。 |
-| [mcpo](https://github.com/open-webui/mcpo) | Python | 把 MCP 转成 **OpenAPI/REST**（不是 MCP 协议），适合 Open WebUI 这类要 OpenAPI 的宿主；MCP 原生远程客户端连不上。 |
-| [joenorton/comfyui-mcp-server](https://github.com/joenorton/comfyui-mcp-server) | Python | **原生 Streamable HTTP** 的第三方 ComfyUI MCP，无需网桥。但它是另一套实现（直连 ComfyUI HTTP API，工具面偏图像/工作流，不含 comfy-cli 的完整 40 工具），与官方 comfy-mcp 是替代而非叠加关系。 |
-| Comfy Cloud MCP（`https://cloud.comfy.org/mcp`） | 托管 | 官方**远程 HTTP** MCP，但工作流跑在 Comfy Cloud GPU 上（要账号、走云），不是驱动本机容器。 |
-
-若更看重「一个进程自带两条传输、并保留官方 comfy-mcp 全部工具」，supergateway 是最省事的组合。
+- **官方 comfy-mcp**（容器内 stdio，server 名 `comfy-mcp`）：官方维护、跟 `comfy-cli` 走、工具语义稳定；强于「跑工作流 + 填模板槽位 + 自省真实节点 / 模型」。日常出片、跑现成工作流用它。
+- **artokun comfyui-mcp**（宿主侧，server 名 `comfyui`）：强于「让 Agent 搭 / 改 / 校验工作流」+ 原生远程 HTTP + 模型家族 skills。需要 Agent 帮你**配置工作流**或**远程调用**时用它。
 
 </details>
 
@@ -374,7 +369,7 @@ models/
 9. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
 10. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
 11. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
-12. 远程 HTTP MCP 网关（supergateway 4.1.x）**无内置入站鉴权**，且是宿主侧长驻进程：切勿公网直连，跨网络请用带鉴权的反代或私有网络，重启后需重新拉起（详见上文「远程 HTTP / SSE」）
+12. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**，且宿主侧远程模式（`mcp-artokun-http`）绑非回环地址必须设 `COMFYUI_MCP_HTTP_TOKEN`；它是长驻进程，重启后需重新拉起，跨公网请叠加 TLS / 私有网络（详见上文「artokun/comfyui-mcp」）
 
 ## 故障排查
 
@@ -418,7 +413,7 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 | [matlowai/ComfyUI-MAINodes](https://github.com/matlowai/ComfyUI-MAINodes) | `H3EvictTextEncoder` 编码后卸载文本编码器节点 |
 | [Comfy-Org/comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) | 官方 Comfy MCP Local（容器内安装） |
 | [Comfy-Org/comfy-cli](https://github.com/Comfy-Org/comfy-cli) | comfy-mcp 的底层引擎 |
-| [supercorp-ai/supergateway](https://github.com/supercorp-ai/supergateway) | 宿主侧 MCP 网桥：把 stdio 转成远程 Streamable HTTP / SSE |
+| [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) | 宿主侧 MCP：让 Agent 搭建 / 编辑工作流 + 原生远程 HTTP |
 | [Saganaki22/ComfyUI-sol-attn](https://github.com/Saganaki22/ComfyUI-sol-attn) | （可选）Sol-Attn 无损加速，支持 SM86（RTX 30 系） |
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |
 
