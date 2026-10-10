@@ -1,7 +1,7 @@
 [workspace]
 name = "comfy-h3-container"
 version = "0.1.0"
-description = "ComfyUI + MiniMax H3 容器化部署：统一任务入口 + 官方 Comfy MCP / artokun MCP（容器内 supervisor 托管）"
+description = "ComfyUI + MiniMax H3 视频生成 + 二次元生图（galgame 素材）容器化部署：统一任务入口 + 官方 Comfy MCP / artokun MCP（容器内 supervisor 托管）"
 authors = ["SilenWang"]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
@@ -45,6 +45,15 @@ models-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models.sh", descript
 models-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh", description = "后台从 HuggingFace 下载模型（可断点续传）" }
 models-extra-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_extra.sh", description = "从 HuggingFace 下载参考/控制模型" }
 models-extra-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh extra", description = "后台从 HuggingFace 下载参考/控制模型（可断点续传）" }
+# 二次元插画底模（galgame 素材：场景图 + 9 向人物设定素材，约 6.9GB）——
+# 对应工作流 workflows/anime_*.json，用法见 README「生成图片」。
+# 用 IMAGE_MODELS=animagine 换 Animagine XL 4.0，=all 两个都下。
+models-image = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_image.sh", description = "下载二次元插画底模（默认 Illustrious XL v2.0，约 6.9GB，默认魔搭）" }
+models-image-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh image", description = "后台下载二次元插画底模（约 6.9GB，默认魔搭，可断点续传）" }
+models-image-status = { cmd = "bash scripts/models_status.sh image", description = "查看二次元插画底模下载进度" }
+models-image-logs = { cmd = "tail -f .build/models_image.log", description = "跟踪二次元插画底模下载日志" }
+models-image-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_image.sh", description = "从 HuggingFace 下载二次元插画底模（约 6.9GB）" }
+models-image-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh image", description = "后台从 HuggingFace 下载二次元插画底模（可断点续传）" }
 
 # ── Comfy MCP Local ─────────────────────────────────────────────────────
 # 推荐：容器内运行（免认证、免宿主 workspace），客户端配置见 mcp-config。

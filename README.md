@@ -18,6 +18,7 @@
 - WebUI + REST API（ComfyUI 原生）
 - 内置 [Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)：在 Claude Code / Cursor 里用自然语言驱动本地 ComfyUI（容器内 stdio server）
 - 集成 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
+- **二次元生图（galgame 素材）**：内置 3 个 SDXL 动漫底模工作流 —— 场景图（背景）、9 向人物设定表（单图 3×3）、9 向人物分向单图（同 seed 一次出 9 张），配套 `pixi run models-image-bg` 一键下底模，全部是 ComfyUI 原生节点、**不用重建镜像**
 - WebUI 认证可一键关闭（局域网自用、免每次输密码）
 - 模型一键下载脚本（断点续传）
 
@@ -27,7 +28,7 @@
 |---|---|---|
 | GPU | NVIDIA 12GB 显存（RTX 3060 实测） | 24GB+ 显存（更快、可跑更高分辨率） |
 | 系统内存 | 32GB | 64GB（offload 稳定） |
-| 磁盘 | 45GB 可用 | NVMe SSD |
+| 磁盘 | 45GB 可用（二次元生图另加约 7GB） | NVMe SSD |
 | 软件 | Docker + nvidia-container-toolkit | Linux / WSL2 |
 
 > 非 NVIDIA（AMD ROCm / Apple Silicon）请参考文末的社区方案。
@@ -48,6 +49,9 @@ cp .env.example .env
 ./scripts/download_models.sh
 # 首次下载很慢（hf CDN 实测约 3–10MB/s，可能几小时），推荐改用后台方式：
 #   pixi run models-bg && pixi run models-status
+
+# 3b.（可选）二次元插画生图底模（约 6.9GB，galgame 场景图 / 9 向人物素材）
+#   pixi run models-image-bg && pixi run models-image-status
 
 # 4. 构建并启动
 docker compose up -d --build
@@ -79,6 +83,15 @@ pixi run models-logs     # 实时跟踪 .build/models.log
 > pixi run models-extra-status    # 查看进度
 > ```
 > 切 HuggingFace 用 `pixi run models-extra-hf-bg` 或 `MODELS_SOURCE=hf pixi run models-extra-bg`。只在做 T2V/I2V 时不必下载这部分，见下文「更多参考方式」。
+
+> 想生成**二次元插画**（galgame 场景图 / 9 向人物设定素材），再下约 6.9GB 的 SDXL 动漫底模：
+> ```bash
+> pixi run models-image-bg                          # 后台启动（默认 Illustrious XL v2.0，可断点续传）
+> pixi run models-image-status                      # 查看进度
+> IMAGE_MODELS=animagine pixi run models-image-bg    # 换成 Animagine XL 4.0
+> IMAGE_MODELS=all pixi run models-image-bg          # 两个底模都下（约 13.9GB）
+> ```
+> 切 HuggingFace 用 `pixi run models-image-hf-bg`。模型只有 6.9GB、CDN 上很快，前台跑 `pixi run models-image` 也可以。用法见下文「生成图片：二次元插画」。
 
 ### 用外部模型目录（避免每次重新下载）
 
@@ -118,7 +131,7 @@ pixi run up             # 构建完成后启动容器（镜像已就绪，不再
 
 ### 生成视频
 
-1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板
+1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板。（二次元生图模板 `anime_scene_t2i` / `anime_character_sheet` / `anime_character_9views` 见下文「生成图片」）
 2. 点 Queue 执行，等待输出（右侧 Video 面板可预览/下载）
 3. 输出文件同时保存在宿主的 `./output/` 目录
 
@@ -174,6 +187,88 @@ CLIPLoader ──→ MiniMaxH3ImageToVideo.clip
 - 它是**条件锚点**而非视频转视频：要改风格用 R2V，要重绘局部用 Fun ControlNet 的 mask。
 
 > 这三个模板基于 Comfy-Org 官方模板，仅把视频 VAE 指向本仓库已下载的 `minimax_h3_video_vae_fp16.safetensors`，省去重复下载 int8 VAE。
+
+## 生成图片：二次元插画（场景图 / 9 向人物设定素材）
+
+容器默认只带视频工作流。二次元出图 = **SDXL 动漫底模 + 仓库自带的三个工作流**，全部用 ComfyUI 核心节点（`CheckpointLoaderSimple` / `CLIPTextEncode` / `KSampler` / `LatentUpscale` / `SaveImage` / `PrimitiveInt` / `Concatenate Text`，ComfyUI ≥ 0.35 即可，本镜像构建时拉最新 master），**不需要重建镜像**，容器启动即出现在 WebUI 的 Workflows 列表里。
+
+| 工作流 | 产出 | 默认尺寸 | 说明 |
+|---|---|---|---|
+| `anime_scene_t2i.json` | 场景图 / galgame 背景 | 1216×832，含 1.5× 二段放大 | `no humans` 纯背景；画布上贴了场景 / 时间 / 光效 / 构图 tag 清单 |
+| `anime_character_sheet.json` | 9 向人物设定表（单图 3×3） | 1024×1024，含 1.5× 二段放大 | 一张图 9 格视角，人物一致性最好，适合角色定稿 / 美术参考图 |
+| `anime_character_9views.json` | 9 向人物分向单图 ×9 | 832×1216 ×9 | 同一 seed + 同一潜空间，只换视角提示词；9 张独立 PNG，可直接当立绘 / 设定素材 |
+
+三个工作流都在画布左上角贴了 `MarkdownNote` 说明节点（用法 / prompt 骨架 / tag 清单），照着手改就行。
+
+### 1. 先下底模（约 6.9GB）
+
+```bash
+pixi run models-image-bg        # 后台下载 Illustrious XL v2.0（默认，可断点续传）
+pixi run models-image-status    # 查看进度
+```
+
+底模落在 `models/checkpoints/`（`MODELS_DIR` 同样生效，可直接下到外部大盘）。换 / 加底模：
+
+```bash
+IMAGE_MODELS=animagine pixi run models-image-bg   # Animagine XL 4.0：插画质感与光影更好
+IMAGE_MODELS=all pixi run models-image-bg         # 两个都下（约 13.9GB）
+```
+
+工作流默认加载 `illustrious-xl-v2.0.safetensors`；想用另一个底模，把 `Load Checkpoint` 节点的 `ckpt_name` 改成 `animagine-xl-4.0.safetensors` 即可（每个工作流各有一处）。
+
+### 2. 场景图（galgame 背景）
+
+打开 `anime_scene_t2i.json`，改 `Prompt (Scene)` 后 Queue，输出在 `output/anime/scene/`。
+
+prompt 骨架（Danbooru tag 风格，逗号分隔，`no humans` 保证是纯背景）：
+
+```
+masterpiece, best quality, very aesthetic, absurdres, no humans, scenery,
+<场景>, <时间/天气>, <镜头/光效>, detailed background, anime screencap, visual novel background
+```
+
+例：`… no humans, scenery, school rooftop, chain-link fence, water tower, sunset, orange sky, clouds, lens flare, wide shot, detailed background …`
+
+常用 tag：
+
+- 场景：`classroom / school hallway / school rooftop / clubroom / library / shrine / shopping district / cafe / beach / bedroom / train station / park`
+- 时间天气：`afternoon / sunset / dusk / night / starry sky / rain / snow`
+- 光效：`sunlight through windows, lens flare, bloom, god rays, rim light, backlighting, dust motes`
+- 构图：`wide shot, from above, depth of field, blurry background, windows`
+
+要一次出一批（比如同一场景多条候选），把 `EmptyLatentImage` 的 `batch_size` 改大即可；竖构图背景把宽高改成 832×1216（`LatentUpscale` 也跟着改成 1248×1824 或不放大）。12GB 显存上二段放大明显更慢，选中 `LatentUpscale` + `KSampler (Hires)` 按 **Ctrl+B** 旁路即可只用 1216×832 出图。
+
+### 3. 9 向人物设定素材
+
+两种产出形式，按用途挑：
+
+**a) 单图 3×3 设定表 —— `anime_character_sheet.json`**
+
+一张图里给出 9 格视角（正面全身 / 正面半身 / 侧面 / 背面 / 各 3/4 向），人物一致性最好，适合角色定稿、给美术当参考图、给下游立绘或 3D 外包对形状。改 `Prompt (Character Sheet)` 里的角色 tags（`1girl, solo, silver hair, long hair, blue eyes, school uniform …`，男性角色改 `1boy`）后 Queue，输出在 `output/anime/character_sheet/`。
+
+**b) 分向单图 ×9 —— `anime_character_9views.json`**
+
+一次出 9 张独立图片：8 个方向的全身图 + 1 张正面半身特写。9 个采样器共用 `Int (Seed)` 的同一个 seed 和同一份潜空间噪声，只换视角提示词 —— 所以 9 张之间人物最一致，出来的 PNG 可以直接当立绘素材或拿去训练角色 LoRA。输出在 `output/anime/character/1_front_full_*.png` 等。
+
+用法上有两个关键点：
+
+1. **角色描述只改一处**：`String (角色描述)` 节点（`1girl, solo, silver hair, …` 换成你的角色），它通过 `Concatenate Text` 拼到 9 个视角提示词前面。想微调某个视角，再改对应的 `String (视角 N)` 节点。
+2. **换角色改 seed**：改 `Int (Seed)` 的值，9 张会一起换；把它的 `control_after_generate` 设成 `randomize`，每次 Queue 整组重新随机，方便刷角色形象。
+
+注意：9 张共用 seed **不等于像素级同一张脸**（模型对不同视角的响应本来就有差异）。要更强一致性：步数提到 30+、CFG 6–7，多抽几组挑一套；或者先按「多视角人物一致性」那一节的思路定一张参考图，再挂 IPAdapter。SDXL 对精确 45° 角的控制有限，正面 / 侧面 / 背面最稳，3/4 向可能要重抽，严格角度请加 ControlNet (OpenPose)。
+
+### 4. 底模与许可（能商用）
+
+| 底模 | 许可 | 特点 |
+|---|---|---|
+| Illustrious XL v2.0（默认） | CreativeML OpenRAIL-M | Danbooru tag 遵循度最好，人物设定 / 立绘稳 |
+| Animagine XL 4.0（可选） | CreativeML OpenRAIL++-M | 插画质感、光影、场景更好看 |
+
+两者的许可**都允许商用**（含 galgame 素材、二次发表），要求是随附许可副本、保留出处声明，并遵守 OpenRAIL 的使用限制条款；生成内容的责任在使用者。权重来源：[🤗 OnomaAIResearch/Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[🤗 cagliostrolab/animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可，脚本默认走魔搭）。
+
+想加风格 / 画师 LoRA：把 `.safetensors` 放进 `models/loras/`，在 WebUI 里拖一个 `Load LoRA` 节点插在 `Load Checkpoint` 和 `KSampler` 之间（`model` / `clip` 各接一条线），再刷新节点列表选文件即可。
+
+> 也可以让 Agent 出图：这些工作流就是普通 ComfyUI 工作流，`pixi run mcp-config` 接上官方 Comfy MCP 后可以直接 `run_workflow` 批量跑；artokun MCP 则能让 Agent 直接改这些工作流的提示词与尺寸。
 
 ## AI 辅助：用 MCP 驱动 ComfyUI（本地 / 远程）
 
@@ -377,6 +472,8 @@ models/
 ├── vae/minimax_h3_audio_vae_fp32.safetensors                            0.61 GB
 ├── loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors      1.96 GB（可选）
 ├── loras/minimax_h3_turbo_v4_step600_ema.safetensors                    0.78 GB（推荐）
+├── checkpoints/illustrious-xl-v2.0.safetensors                          6.94 GB（二次元生图底模，默认）
+├── checkpoints/animagine-xl-4.0.safetensors                             6.94 GB（二次元生图底模，可选）
 ├── diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors  19.53 GB（R2V，额外）
 ├── loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors     1.82 GB（R2V Turbo，额外）
 ├── model_patches/minimax_h3_fun_controlnet_union_pruned_int8_convrot…  2.14 GB（动作控制，额外）
@@ -384,7 +481,7 @@ models/
 └── diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors                 0.12 GB（SDPose 检测器，额外）
 ```
 
-> 后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra-bg` 下载；只做 T2V / I2V 不必装。
+> 两个二次元生图底模（约 6.9GB/个）用 `pixi run models-image-bg` 下载，只做 T2V / I2V 不必装；上面最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra-bg` 下载。
 
 ## 📊 实测性能（RTX 3060 12GB）
 
@@ -412,6 +509,9 @@ models/
 10. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
 11. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
 12. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可把映射收回 `"127.0.0.1:9100:19100"`（详见上文「artokun/comfyui-mcp」）
+13. 二次元生图用的是 SDXL 底模（Illustrious XL v2.0 / Animagine XL 4.0，各约 6.9GB）：12GB 显存跑 1024 档没问题，但本文档「实测性能」一节的数字**只覆盖视频链路**，生图耗时未在本仓库实测；二段放大（hires）在 12GB 上明显更慢，可 Ctrl+B 旁路
+14. SDXL 对精确 45° 视角控制有限：正面 / 侧面 / 背面最稳，3/4 向常需重抽，严格角度要靠 ControlNet (OpenPose)；`anime_character_9views` 里 9 张共用 seed 也不等于像素级同一张脸，一致性要求高时请提高步数 / CFG 并多抽几组挑选
+15. 二次元底模许可：Illustrious XL v2.0 = CreativeML OpenRAIL-M，Animagine XL 4.0 = OpenRAIL++-M，**允许商用**（含 galgame 素材）但须随附许可副本、保留出处声明并遵守 OpenRAIL 使用限制条款；生成内容的责任在使用者
 
 ## 故障排查
 
@@ -458,9 +558,12 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 | [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) | 容器内托管 MCP：让 Agent 搭建 / 编辑工作流（Streamable HTTP） |
 | [Saganaki22/ComfyUI-sol-attn](https://github.com/Saganaki22/ComfyUI-sol-attn) | （可选）Sol-Attn 无损加速，支持 SM86（RTX 30 系） |
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |
+| [OnomaAIResearch/Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0) | 二次元生图默认底模（SDXL 动漫 checkpoint） |
+| [cagliostrolab/animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0) | 二次元生图备用底模（插画质感 / 光影） |
 
 ## License
 
 - 本仓库部署脚本/配置：Apache-2.0
 - ComfyUI / ai-dock / 各插件：遵循其各自开源许可证
 - MiniMax H3 模型权重：MiniMax H3 Community License（注意地区限制）
+- 二次元生图底模权重：Illustrious XL v2.0（CreativeML OpenRAIL-M）/ Animagine XL 4.0（OpenRAIL++-M），允许商用，须遵守各自许可的使用限制条款
