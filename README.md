@@ -273,7 +273,7 @@ masterpiece, best quality, very aesthetic, absurdres, no humans, scenery,
 
 镜像内**只内置一套 MCP**：第三方的 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) —— 由容器内 supervisord 托管、随容器启动、以 Streamable HTTP 暴露，客户端连一个 `URL + token` 即可，强于**让 Agent 直接搭建 / 编辑 / 校验工作流**。
 
-[官方 Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)（stdio，客户端每次都要 `docker exec -i comfyui-h3 comfy-mcp` 现起进程）**已从镜像中移除**：它用起来不方便、客户端配置繁琐，容器里留第三方这一套即可。如仍需要，见下文「备选：在宿主机上跑官方 Comfy MCP Local」。
+[官方 Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)（stdio，客户端每次都要 `docker exec -i comfyui-h3 comfy-mcp` 现起进程）**已彻底移除**：镜像内不再安装 `comfy-cli` / `comfy-mcp`，仓库也不再提供宿主侧备选（它用起来不方便、客户端配置繁琐），容器里只留第三方这一套。
 
 ### artokun/comfyui-mcp — 容器内托管服务（Agent 搭 / 改工作流 + 统一日志）
 
@@ -345,12 +345,12 @@ docker run --rm --add-host host.docker.internal:host-gateway <你的镜像> \
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `COMFYUI_MCP_HTTP_TOKEN` | `comfy-h3-mcp` | 入站鉴权令牌（`Authorization: Bearer` / `X-API-Key`）。**端口默认对外开放，务必改成强随机值** |
-| host 端口映射 | `9100:19100` | 绑宿主所有接口（同机其他容器 + 局域网可达）。想收回成只允许宿主机本机：改 `docker-compose.yml` 为 `"127.0.0.1:9100:19100"` |
-| `COMFYUI_MCP_PORT_LOCAL` | `19100` | 容器内监听端口（镜像 ENV） |
+| `COMFYUI_MCP_PORT_HOST` | `9100` | 宿主端口，绑所有接口（同机其他容器 + 局域网可达）。想收回成只允许宿主机本机：在 `.env` 里设 `COMFYUI_MCP_PORT_HOST=127.0.0.1:9100` |
+| `COMFYUI_MCP_PORT_LOCAL` | `19100` | 容器内监听端口，与上面的宿主端口**联动**（`.env` 改一处即可，映射始终对齐） |
 
 > ⚠️ **第三方 + 有限维护**：`artokun/comfyui-mcp` 是社区实现（MIT / Node ≥22），README 标注 limited maintenance，工具面与官方 comfy-cli **不通用**；H3 的 `MiniMaxH3TurboLoRA` / `PathchSageAttentionKJ` / `H3EvictTextEncoder` 这套专用链它也不认识，但能读容器里**实际安装**的 `/object_info`。最稳的用法是把仓库现成的 `workflows/*.json` 当模板喂给 Agent，让它在此基础上改参 / 接线。
 >
-> **安全**：端口默认绑宿主所有接口（`9100:19100`），同机容器与局域网都能连，而鉴权只有 Bearer token —— 默认值 `comfy-h3-mcp` 形同公开。**务必先在 `.env` 里设强随机值**（`openssl rand -hex 16`），且只部署在可信网络；跨不可信网络请套 TLS 反代或走 Tailscale / WireGuard。只想宿主机本机用：把映射改回 `"127.0.0.1:9100:19100"`。
+> **安全**：端口默认绑宿主所有接口（`9100:19100`），同机容器与局域网都能连，而鉴权只有 Bearer token —— 默认值 `comfy-h3-mcp` 形同公开。**务必先在 `.env` 里设强随机值**（`openssl rand -hex 16`），且只部署在可信网络；跨不可信网络请套 TLS 反代或走 Tailscale / WireGuard。只想宿主机本机用：在 `.env` 里设 `COMFYUI_MCP_PORT_HOST=127.0.0.1:9100`。
 
 <details>
 <summary>查看 / 管理容器内服务（supervisor）</summary>
@@ -363,20 +363,6 @@ docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-mcp.log
 ```
 
 只想看某个服务：`docker exec comfyui-h3 tail -f /var/log/supervisor/caddy.log`。
-
-</details>
-
-<details>
-<summary>备选：在宿主机上跑官方 Comfy MCP Local（镜像内已不安装）</summary>
-
-官方 [comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) 是 stdio server，引擎是 `comfy-cli`，强于「跑工作流 + 填模板槽位 + 自省真实节点 / 模型」、工具语义官方稳定。容器里不再装它（客户端每次要 `docker exec` 起进程，用起来不方便），需要时可以在宿主侧用仓库自带的 `pixi` 环境跑：
-
-```bash
-pixi install                  # 装 comfy-cli + comfy-mcp（宿主侧，不影响镜像）
-pixi run mcp-config host      # 打印带绝对路径的客户端配置
-```
-
-两条注意：① comfy-cli 需要有可用 workspace（宿主没有 ComfyUI 目录时先 `comfy install` 或 `comfy set-default <一个 ComfyUI 检出目录>`）；② 宿主侧的 `COMFYUI_URL` 指向 `http://127.0.0.1:8188`，也就是 **caddy 那一层**——若 `WEB_ENABLE_AUTH=true` 会直接返回 401，需要先关闭认证。
 
 </details>
 
@@ -467,7 +453,7 @@ models/
 8. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
 9. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
 10. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
-11. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可把映射收回 `"127.0.0.1:9100:19100"`（详见上文「artokun/comfyui-mcp」）
+11. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可在 `.env` 里设 `COMFYUI_MCP_PORT_HOST=127.0.0.1:9100`（详见上文「artokun/comfyui-mcp」）
 12. 二次元生图用的是 SDXL 底模（Illustrious XL v2.0 / Animagine XL 4.0，各约 6.9GB）：12GB 显存跑 1024 档没问题，但本文档「实测性能」一节的数字**只覆盖视频链路**，生图耗时未在本仓库实测；二段放大（hires）在 12GB 上明显更慢，可 Ctrl+B 旁路
 13. SDXL 对精确 45° 视角控制有限：正面 / 侧面 / 背面最稳，3/4 向常需重抽，严格角度要靠 ControlNet (OpenPose)；`anime_character_9views` 里 9 张共用 seed 也不等于像素级同一张脸，一致性要求高时请提高步数 / CFG 并多抽几组挑选
 14. 二次元底模许可：Illustrious XL v2.0 = CreativeML OpenRAIL-M，Animagine XL 4.0 = OpenRAIL++-M，**允许商用**（含 galgame 素材）但须随附许可副本、保留出处声明并遵守 OpenRAIL 使用限制条款；生成内容的责任在使用者
@@ -512,8 +498,6 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 | [larryvrh/MiniMax-H3-Turbo-Lora](https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora) | v4-600 Turbo LoRA 权重 |
 | [kijai/ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `PathchSageAttentionKJ` 注意力加速节点（+ `sageattention`） |
 | [matlowai/ComfyUI-MAINodes](https://github.com/matlowai/ComfyUI-MAINodes) | `H3EvictTextEncoder` 编码后卸载文本编码器节点 |
-| [Comfy-Org/comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) | 官方 Comfy MCP Local（可选：仅宿主侧 pixi 环境，镜像内已不安装） |
-| [Comfy-Org/comfy-cli](https://github.com/Comfy-Org/comfy-cli) | 官方 Comfy MCP Local 的底层引擎（同上，宿主侧可选） |
 | [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) | 容器内托管 MCP：让 Agent 搭建 / 编辑工作流（Streamable HTTP） |
 | [Saganaki22/ComfyUI-sol-attn](https://github.com/Saganaki22/ComfyUI-sol-attn) | （可选）Sol-Attn 无损加速，支持 SM86（RTX 30 系） |
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |

@@ -98,9 +98,7 @@ RUN for repo in \
 # 注：容器内只保留第三方 artokun MCP（下一节）。
 #    官方 Comfy MCP Local（Comfy-Org/comfy-mcp，stdio；客户端靠
 #    `docker exec -i comfyui-h3 comfy-mcp` 每次现起进程）已按使用反馈从镜像中
-#    移除，镜像内不再安装 comfy-cli / comfy-mcp —— 它用起来不方便，容器里留
-#    第三方这一套即可。如需官方 MCP，可在宿主侧用 pixi 环境跑（见 README
-#    「备选：在宿主机上跑官方 Comfy MCP Local」）。
+#    彻底移除：镜像内不再安装 comfy-cli / comfy-mcp，仓库也不再提供宿主侧备选。
 # ---------------------------------------------------------------
 
 # ---------------------------------------------------------------
@@ -163,6 +161,11 @@ ENV COMFYUI_PORT_HOST=8188
 ENV WEB_PASSWORD=comfy-h3
 ENV COMFY_LOCAL_URL=http://127.0.0.1:18188
 ENV COMFYUI_MCP_PORT_LOCAL=19100
+# 注意：下面只是「镜像默认值 / 兜底值」，不是把 token 写死在这里。
+#   - 经 docker compose 启动时，docker-compose.yml 的 environment 会用宿主 .env
+#     （或 shell 环境）里的 COMFYUI_MCP_HTTP_TOKEN 覆盖下面这个值；
+#   - 只有直接 `docker run comfy-h3-container:latest` 且没带 `-e` 时才会用到它。
+#   改完 .env 要 `docker compose up -d`（重建容器）才生效，`docker restart` 不重读。
 ENV COMFYUI_MCP_HTTP_TOKEN=comfy-h3-mcp
 
 EXPOSE 8188

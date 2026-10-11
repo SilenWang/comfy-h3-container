@@ -10,8 +10,8 @@
 # AI 辅助（随容器由 supervisord 托管，日志统一进 `docker compose logs`）：
 #   artokun MCP       容器内服务（Streamable HTTP，端口 19100→宿主 9100），随容器启动，
 #                     能让 Agent 直接搭建/编辑工作流；配置见 `pixi run mcp-config`
-#   官方 Comfy MCP Local（stdio）已从镜像移除（客户端每次都要 `docker exec` 起进程，
-#   用起来不方便）；如仍需要，可在宿主侧用 pixi 跑：`pixi run mcp-config host`
+#   官方 Comfy MCP Local（stdio）已从镜像彻底移除（客户端每次都要 `docker exec`
+#   起进程，用起来不方便），仓库不再提供宿主侧备选。
 services:
   comfyui:
     build: .
@@ -26,9 +26,11 @@ services:
       # 绑 0.0.0.0（不写 IP 即全部接口）：同机其他容器与局域网都能访问。
       #   同机其他容器不能用 127.0.0.1（那是容器自己的 loopback），要用宿主 IP 或
       #   `--add-host host.docker.internal:host-gateway`（详见 README）。
-      # 想收回成只允许宿主机本机访问：改成 "127.0.0.1:9100:19100"。
+      # 想收回成只允许宿主机本机访问：在 .env 里设 COMFYUI_MCP_PORT_HOST=127.0.0.1:9100。
+      # 两端端口都可用 .env 覆盖，此处保证「宿主 : 容器」始终对齐：
+      #   COMFYUI_MCP_PORT_HOST（宿主，默认 9100）/ COMFYUI_MCP_PORT_LOCAL（容器内，默认 19100）
       # 对外暴露前务必把 .env 里的 COMFYUI_MCP_HTTP_TOKEN 改成强随机值。
-      - "9100:19100"
+      - "${COMFYUI_MCP_PORT_HOST:-9100}:${COMFYUI_MCP_PORT_LOCAL:-19100}"
       # 可选：容器内 ComfyUI 直连端口（18188），供调试 / 绕过 caddy 认证时使用。
       # 仅绑定 127.0.0.1，不对局域网/公网暴露。
       # - "127.0.0.1:18188:18188"
@@ -47,7 +49,12 @@ services:
       # --lowvram：按需加载/卸载，12GB 显卡实测关键参数
       COMFYUI_ARGS: "--listen 0.0.0.0 --lowvram"
       # artokun MCP（容器内）的入站鉴权令牌；远程客户端需带 Authorization: Bearer <token>
+      # 取值来源：宿主 .env（docker compose 会自动读本目录 .env）或 shell 环境里的
+      # 同名变量；只有它完全没设时才回落到下面的默认值 comfy-h3-mcp（形同公开）。
+      # 改完 .env 需 `docker compose up -d` 重建容器才生效（restart 不会重读 .env）。
       COMFYUI_MCP_HTTP_TOKEN: ${COMFYUI_MCP_HTTP_TOKEN:-comfy-h3-mcp}
+      # 容器内 MCP 监听端口，与上面的宿主端口映射联动（改一处即可，两端始终对齐）
+      COMFYUI_MCP_PORT_LOCAL: ${COMFYUI_MCP_PORT_LOCAL:-19100}
     volumes:
       # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
       # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：
