@@ -24,7 +24,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 二次元场景图（galgame 背景素材）\n\n**先下模型**：`pixi run models-image-bg`（默认 Illustrious XL v2.0，约 6.9GB）\n\n### 用法\n1. 改 `Prompt (Scene)` 里的场景描述 —— Danbooru tag 风格，逗号分隔，`no humans` 保证是纯背景\n2. 尺寸默认 1216×832（SDXL 16:9 原生比例）；竖构图场景改 `EmptyLatentImage` 为 832×1216\n3. Queue，输出在 `output/anime/scene/`\n\n### prompt 骨架\n`masterpiece, best quality, very aesthetic, absurdres, no humans, scenery, <场景>, <时间/天气>, <镜头/光效>, detailed background, anime screencap, visual novel background`\n\n### 常用 tag\n- 场景：`classroom / school hallway / school rooftop / clubroom / library / shrine / shopping district / cafe / beach / bedroom / train station`\n- 时间：`afternoon / sunset / dusk / night / starry sky`\n- 光效：`sunlight through windows, lens flare, bloom, god rays, rim light, backlighting`\n- 构图：`wide shot, from above, depth of field, blurry background`\n\n### 12GB 显存提示\n二段放大（hires）会明显变慢：选中 `LatentUpscale` 与 `KSampler (Hires)` 后按 Ctrl+B 旁路，即可只用 1216×832 出图。"
+        "## 二次元场景图（galgame 背景素材）\n\n**先下模型**：`pixi run models-image`（默认 Illustrious XL v2.0，约 6.9GB）\n\n### 用法\n1. 改 `Prompt (Scene)` 里的场景描述 —— Danbooru tag 风格，逗号分隔，`no humans` 保证是纯背景\n2. 尺寸默认 1216×832（SDXL 16:9 原生比例）；竖构图场景改 `EmptyLatentImage` 为 832×1216\n3. Queue，输出在 `output/anime/scene/`\n\n### prompt 骨架\n`masterpiece, best quality, very aesthetic, absurdres, no humans, scenery, <场景>, <时间/天气>, <镜头/光效>, detailed background, anime screencap, visual novel background`\n\n### 常用 tag\n- 场景：`classroom / school hallway / school rooftop / clubroom / library / shrine / shopping district / cafe / beach / bedroom / train station`\n- 时间：`afternoon / sunset / dusk / night / starry sky`\n- 光效：`sunlight through windows, lens flare, bloom, god rays, rim light, backlighting`\n- 构图：`wide shot, from above, depth of field, blurry background`\n\n### 12GB 显存提示\n二段放大（hires）会明显变慢：选中 `LatentUpscale` 与 `KSampler (Hires)` 后按 Ctrl+B 旁路，即可只用 1216×832 出图。"
       ],
       "title": "Note: 使用说明（场景图）",
       "color": "#222",
@@ -50,7 +50,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image-bg` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
+        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
       ],
       "title": "Note: 底模与许可",
       "color": "#222",

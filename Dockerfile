@@ -105,11 +105,11 @@ RUN for repo in \
 #     - 文本编码器用 Qwen2.5-VL GGUF 时**必须同目录放一份 mmproj*.gguf**（视觉塔）：节点
 #       按「文件名包含编码器基名」匹配，匹配不到会在日志里报
 #       "Can't find mmproj file ... Qwen-Image-Edit will be broken"。
-#       scripts/download_models_qwen_edit.sh 已把上游的 mmproj-F16.gguf 重命名成
+#       scripts/download_models.sh（qwen-edit 类别）已把上游的 mmproj-F16.gguf 重命名成
 #       Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf 以满足该规则。
 #     - 依赖 gguf>=0.13.0；sentencepiece / protobuf 是 requirements 里的可选项（GGUF
 #       tokenizer 兜底），一并装上以免个别权重走 tokenizer 重建路径时报缺依赖。
-#       工作流：workflows/qwen_image_edit_gguf*.json，用法见 README「修图：Qwen-Image-Edit」。
+#       工作流：workflows/qwen_image_edit_gguf*.json，用法见 docs/image-edit.md。
 # ---------------------------------------------------------------
 RUN for i in 1 2 3 4 5; do \
         git clone --depth 1 https://github.com/city96/ComfyUI-GGUF \
@@ -178,7 +178,7 @@ COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 #    - COMFYUI_ARGS: --lowvram 按需加载/卸载（12GB 显卡实测关键参数）
 #    - COMFYUI_PORT_LOCAL: 容器内 ComfyUI 监听端口（必须 != COMFYUI_PORT_HOST，
 #      否则与 ai-dock 的 caddy 反向代理冲突）
-#    - WEB_PASSWORD / WEB_ENABLE_AUTH: ai-dock 的 caddy 认证（详见 README）
+#    - WEB_PASSWORD / WEB_ENABLE_AUTH: ai-dock 的 caddy 认证（详见 docs/configuration.md）
 #    - COMFY_LOCAL_URL: 容器内 artokun MCP 连 ComfyUI 的地址。
 #      ComfyUI 进程监听 COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内
 #      MCP 直连 18188 可以完全绕过反代与认证。
