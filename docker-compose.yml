@@ -7,11 +7,11 @@
 #   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
-# AI 辅助（都随容器由 supervisord 托管，日志统一进 `docker compose logs`）：
-#   Comfy MCP Local   容器内官方 stdio server，客户端用 `docker exec -i` 调起；
-#                     配置见 `pixi run mcp-config`（默认容器模式）
+# AI 辅助（随容器由 supervisord 托管，日志统一进 `docker compose logs`）：
 #   artokun MCP       容器内服务（Streamable HTTP，端口 19100→宿主 9100），随容器启动，
-#                     能让 Agent 直接搭建/编辑工作流；配置见 `pixi run mcp-config artokun`
+#                     能让 Agent 直接搭建/编辑工作流；配置见 `pixi run mcp-config`
+#   官方 Comfy MCP Local（stdio）已从镜像移除（客户端每次都要 `docker exec` 起进程，
+#   用起来不方便）；如仍需要，可在宿主侧用 pixi 跑：`pixi run mcp-config host`
 services:
   comfyui:
     build: .

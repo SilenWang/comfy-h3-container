@@ -16,8 +16,7 @@
 - **SageAttention 注意力加速**：两个 workflow 已内置 `PathchSageAttentionKJ` 节点（Ampere/Ada 约 1.3–2×，不改生成结果）
 - **文本编码器显式卸载**：内置 `H3EvictTextEncoder`，编码后立即释放 15.7GB 的 Qwen3-VL，避免采样阶段反复经 PCIe 换入换出
 - WebUI + REST API（ComfyUI 原生）
-- 内置 [Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)：在 Claude Code / Cursor 里用自然语言驱动本地 ComfyUI（容器内 stdio server）
-- 集成 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
+- 内置 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
 - **二次元生图（galgame 素材）**：内置 3 个 SDXL 动漫底模工作流 —— 场景图（背景）、9 向人物设定表（单图 3×3）、9 向人物分向单图（同 seed 一次出 9 张），配套 `pixi run models-image-bg` 一键下底模，全部是 ComfyUI 原生节点、**不用重建镜像**
 - WebUI 认证可一键关闭（局域网自用、免每次输密码）
 - 模型一键下载脚本（断点续传）
@@ -268,62 +267,17 @@ masterpiece, best quality, very aesthetic, absurdres, no humans, scenery,
 
 想加风格 / 画师 LoRA：把 `.safetensors` 放进 `models/loras/`，在 WebUI 里拖一个 `Load LoRA` 节点插在 `Load Checkpoint` 和 `KSampler` 之间（`model` / `clip` 各接一条线），再刷新节点列表选文件即可。
 
-> 也可以让 Agent 出图：这些工作流就是普通 ComfyUI 工作流，`pixi run mcp-config` 接上官方 Comfy MCP 后可以直接 `run_workflow` 批量跑；artokun MCP 则能让 Agent 直接改这些工作流的提示词与尺寸。
+> 也可以让 Agent 出图：这些工作流就是普通 ComfyUI 工作流，接上容器的 artokun MCP 后，Agent 能直接改提示词与尺寸并批量跑。
 
 ## AI 辅助：用 MCP 驱动 ComfyUI（本地 / 远程）
 
-仓库接了两套 MCP，分工不同、可并存：
+镜像内**只内置一套 MCP**：第三方的 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) —— 由容器内 supervisord 托管、随容器启动、以 Streamable HTTP 暴露，客户端连一个 `URL + token` 即可，强于**让 Agent 直接搭建 / 编辑 / 校验工作流**。
 
-- **[官方 comfy-mcp](https://github.com/Comfy-Org/comfy-mcp)**（容器内 stdio）：基于 `comfy-cli`，强于**跑工作流 + 填模板槽位 + 查询容器里真实安装的节点/模型**，工具语义官方稳定。
-- **[artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)**（容器内托管服务）：第三方，强于**让 Agent 直接搭建 / 编辑 / 校验工作流**；由 supervisord 随容器启动并暴露 Streamable HTTP。想让 Agent 帮你**预配置工作流**就用它。
+[官方 Comfy MCP Local](https://github.com/Comfy-Org/comfy-mcp)（stdio，客户端每次都要 `docker exec -i comfyui-h3 comfy-mcp` 现起进程）**已从镜像中移除**：它用起来不方便、客户端配置繁琐，容器里留第三方这一套即可。如仍需要，见下文「备选：在宿主机上跑官方 Comfy MCP Local」。
 
-### 1. 官方 Comfy MCP Local — 容器内 stdio（跑现成工作流，推荐）
+### artokun/comfyui-mcp — 容器内托管服务（Agent 搭 / 改工作流 + 统一日志）
 
-[官方 comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) 是 stdio MCP server，引擎是 `comfy-cli`。本镜像把它**装在容器内**，并已把 comfy-cli 的 workspace 指向 `/opt/ComfyUI`，所以开箱即用。
-
-**为什么装在容器内**：MCP 直连容器内 ComfyUI 的 `127.0.0.1:18188`，**完全绕过 8188 上的 caddy 反代**，因此与 WebUI 认证开关无关——这也是「MCP 不用再单独验证」的原因。
-
-客户端配置（先确认容器在跑：`pixi run up`）：
-
-```jsonc
-// Claude Desktop / Cursor 配置片段；用 `pixi run mcp-config` 可随时打印
-{
-  "mcpServers": {
-    "comfy-mcp": {
-      "command": "docker",
-      "args": ["exec", "-i", "comfyui-h3", "comfy-mcp"]
-    }
-  }
-}
-```
-
-```bash
-# Claude Code：一条命令注册
-claude mcp add comfy-mcp -- docker exec -i comfyui-h3 comfy-mcp
-```
-
-配好后就能说「确认本地 ComfyUI 在跑，然后跑某个工作流并把视频给我」——agent 会依次调 `server_info` → `run_workflow` → `fetch_outputs`。它能**看到容器内真实安装的节点和模型**（含 H3 与 Turbo 插件），比通用知识库可靠。
-
-> 排查：镜像构建时已自动执行 `comfy set-default /opt/ComfyUI`。若容器内工具报找不到 workspace，重新执行一次即可：
-> `docker exec comfyui-h3 comfy set-default /opt/ComfyUI`。
-
-<details>
-<summary>备选：把官方 MCP server 跑在宿主机上（需要额外准备）</summary>
-
-仓库自带 `pixi` 环境，也可以在宿主直接跑：
-
-```bash
-pixi install                  # 装 comfy-cli + comfy-mcp
-pixi run mcp-config host      # 打印带绝对路径的客户端配置
-```
-
-两条注意：① comfy-cli 需要有可用 workspace（宿主没有 ComfyUI 目录时先 `comfy install` 或 `comfy set-default <一个 ComfyUI 检出目录>`）；② 宿主侧的 `COMFYUI_URL` 会指向 `http://127.0.0.1:8188`，也就是 **caddy 那一层**——若 `WEB_ENABLE_AUTH=true` 会直接返回 401，需要先关闭认证。综合考虑，容器模式更省事。
-
-</details>
-
-### 2. artokun/comfyui-mcp — 容器内托管服务（Agent 搭 / 改工作流 + 统一日志）
-
-官方 comfy-mcp 偏「执行 + 模板 + 自省」，**不能从零搭图**。若你想让 Agent **帮你预配置 / 编辑工作流**，用第三方的 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)（npm 包 `comfyui-mcp`）：它能 `create_workflow`（从模板或从零建节点 / 连线 / 设参）、`modify`（增删改连）、`validate`（运行前校验）、`get_workflow` / `save_workflow`（读 / 存工作流库），还带模型家族 skills（含 **MiniMax H3**）。
+第三方 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)（npm 包 `comfyui-mcp`）能让 Agent **帮你预配置 / 编辑工作流**：它能 `create_workflow`（从模板或从零建节点 / 连线 / 设参）、`modify`（增删改连）、`validate`（运行前校验）、`get_workflow` / `save_workflow`（读 / 存工作流库），还带模型家族 skills（含 **MiniMax H3**）。
 
 **它以容器内服务运行，由 supervisord 托管、随容器一起启动**（不需要宿主另起进程）：
 
@@ -331,7 +285,7 @@ pixi run mcp-config host      # 打印带绝对路径的客户端配置
 - 直连同容器 ComfyUI 的 `127.0.0.1:18188`，绕过 8188 上的 caddy。
 - 日志写 `/var/log/supervisor/comfyui-mcp.log`；ai-dock 的 `logtail` 会把该目录所有日志汇总到容器 stdout，因此 **comfyui / caddy / comfyui-mcp 的日志在 `docker compose logs` 里都能同时看到**。
 
-客户端配置（`pixi run mcp-config artokun` 可随时打印）：
+客户端配置（`pixi run mcp-config` 可随时打印）：
 
 ```jsonc
 {
@@ -413,10 +367,16 @@ docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-mcp.log
 </details>
 
 <details>
-<summary>与官方 comfy-mcp 的分工（两套可并存）</summary>
+<summary>备选：在宿主机上跑官方 Comfy MCP Local（镜像内已不安装）</summary>
 
-- **官方 comfy-mcp**（容器内 stdio，server 名 `comfy-mcp`）：官方维护、跟 `comfy-cli` 走、工具语义稳定；强于「跑工作流 + 填模板槽位 + 自省真实节点 / 模型」。日常出片、跑现成工作流用它。
-- **artokun comfyui-mcp**（容器内托管服务，server 名 `comfyui`）：强于「让 Agent 搭 / 改 / 校验工作流」+ 远程 HTTP + 模型家族 skills。需要 Agent 帮你**配置工作流**时用它。
+官方 [comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) 是 stdio server，引擎是 `comfy-cli`，强于「跑工作流 + 填模板槽位 + 自省真实节点 / 模型」、工具语义官方稳定。容器里不再装它（客户端每次要 `docker exec` 起进程，用起来不方便），需要时可以在宿主侧用仓库自带的 `pixi` 环境跑：
+
+```bash
+pixi install                  # 装 comfy-cli + comfy-mcp（宿主侧，不影响镜像）
+pixi run mcp-config host      # 打印带绝对路径的客户端配置
+```
+
+两条注意：① comfy-cli 需要有可用 workspace（宿主没有 ComfyUI 目录时先 `comfy install` 或 `comfy set-default <一个 ComfyUI 检出目录>`）；② 宿主侧的 `COMFYUI_URL` 指向 `http://127.0.0.1:8188`，也就是 **caddy 那一层**——若 `WEB_ENABLE_AUTH=true` 会直接返回 401，需要先关闭认证。
 
 </details>
 
@@ -459,7 +419,7 @@ docker compose up -d      # 重建容器生效
 | `COMFYUI_PORT_HOST` | `8188` | 对外端口（caddy 反向代理） |
 | `COMFYUI_PORT_LOCAL` | `18188` | 容器内 ComfyUI 监听端口（**不可与 HOST 相同**，否则端口冲突） |
 | `COMFYUI_ARGS` | `--listen 0.0.0.0 --lowvram` | ComfyUI 启动参数（`--lowvram` 为 12GB 显存关键优化） |
-| `COMFY_LOCAL_URL` | `http://127.0.0.1:18188` | 容器内 comfy-cli / artokun 连 ComfyUI 的地址（供 MCP 使用） |
+| `COMFY_LOCAL_URL` | `http://127.0.0.1:18188` | 容器内 artokun MCP 连 ComfyUI 的地址（供 MCP 使用） |
 | `COMFYUI_MCP_HTTP_TOKEN` | `comfy-h3-mcp`（镜像默认） | artokun MCP 服务的入站鉴权令牌（`Authorization: Bearer` / `X-API-Key`）；对局域网 / 公网开放前务必改强 |
 
 模型目录结构（`models/` 挂载进容器 `/workspace/models`）：
@@ -501,17 +461,16 @@ models/
 2. v4-600 Turbo LoRA 在 **4 步 + 大幅快速运动**场景偶有 motion-smear，遇到可改用 6-8 步（仍快于官方 20 步）
 3. 完整 H3 系统（H3-Context-IR / 2K 再生）为云端 API，未开源；本方案为本地 H3-Base（768p 档）
 4. 模型权重遵循 MiniMax H3 社区许可（注意地区限制：排除美/欧/英/韩）
-5. Comfy MCP Local 的 `launch_comfyui` / 停止 / 日志类工具语义受限：ComfyUI 在容器内由 ai-dock 启动，comfy-cli 再 `launch` 会另起一个进程。日常用 `run_workflow` / `server_info` / `fetch_outputs` 不受影响
-6. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 codeload tarball 拉源码，ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟），并先装 PyPI V1 兜底、编译后校验 import，避免"构建成功却漏装"。万一构建失败，把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退；既有容器可 `pixi run fix-sage-attn` 现场补装
-7. 自带 workflow **不再内置 EasyCache**：4 步配置下其收益有限且后段可能起颗粒。需要时自行叠加默认参数的 `EasyCache`，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上
-8. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
-9. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
-10. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
-11. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
-12. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可把映射收回 `"127.0.0.1:9100:19100"`（详见上文「artokun/comfyui-mcp」）
-13. 二次元生图用的是 SDXL 底模（Illustrious XL v2.0 / Animagine XL 4.0，各约 6.9GB）：12GB 显存跑 1024 档没问题，但本文档「实测性能」一节的数字**只覆盖视频链路**，生图耗时未在本仓库实测；二段放大（hires）在 12GB 上明显更慢，可 Ctrl+B 旁路
-14. SDXL 对精确 45° 视角控制有限：正面 / 侧面 / 背面最稳，3/4 向常需重抽，严格角度要靠 ControlNet (OpenPose)；`anime_character_9views` 里 9 张共用 seed 也不等于像素级同一张脸，一致性要求高时请提高步数 / CFG 并多抽几组挑选
-15. 二次元底模许可：Illustrious XL v2.0 = CreativeML OpenRAIL-M，Animagine XL 4.0 = OpenRAIL++-M，**允许商用**（含 galgame 素材）但须随附许可副本、保留出处声明并遵守 OpenRAIL 使用限制条款；生成内容的责任在使用者
+5. PyPI 的 `sageattention` 只有 V1（Triton），不含 KJ 节点默认模式所需的 2.x CUDA 算子，故镜像构建期从源码编译官方 SageAttention **v2.2.0**（用 codeload tarball 拉源码，ai-dock 自带 nvcc，目标 arch 8.0/8.6，耗时数分钟），并先装 PyPI V1 兜底、编译后校验 import，避免"构建成功却漏装"。万一构建失败，把 `PathchSageAttentionKJ` 的模式改为 `auto`（V1）或 `disabled` 即可无损回退；既有容器可 `pixi run fix-sage-attn` 现场补装
+6. 自带 workflow **不再内置 EasyCache**：4 步配置下其收益有限且后段可能起颗粒。需要时自行叠加默认参数的 `EasyCache`，且不要与其它缓存节点（如 Spectrum）叠在同一模型分支上
+7. 内置工作流的视频解码用 `VAEDecodeTiled`（分块解码）：显存占用显著低于整段解码，且**画质逐像素一致**（同种子 A/B 实测 PSNR=inf / SSIM=1.0）。但 12GB 卡上限制时长的**真正瓶颈在采样阶段**：720p（1280×736）实测 **5 秒**可稳定出片，10 秒以上采样/解码均易 OOM；要更长请降到 0.4MP/0.2MP，或换 16GB+ 显存的卡
+8. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
+9. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
+10. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
+11. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可把映射收回 `"127.0.0.1:9100:19100"`（详见上文「artokun/comfyui-mcp」）
+12. 二次元生图用的是 SDXL 底模（Illustrious XL v2.0 / Animagine XL 4.0，各约 6.9GB）：12GB 显存跑 1024 档没问题，但本文档「实测性能」一节的数字**只覆盖视频链路**，生图耗时未在本仓库实测；二段放大（hires）在 12GB 上明显更慢，可 Ctrl+B 旁路
+13. SDXL 对精确 45° 视角控制有限：正面 / 侧面 / 背面最稳，3/4 向常需重抽，严格角度要靠 ControlNet (OpenPose)；`anime_character_9views` 里 9 张共用 seed 也不等于像素级同一张脸，一致性要求高时请提高步数 / CFG 并多抽几组挑选
+14. 二次元底模许可：Illustrious XL v2.0 = CreativeML OpenRAIL-M，Animagine XL 4.0 = OpenRAIL++-M，**允许商用**（含 galgame 素材）但须随附许可副本、保留出处声明并遵守 OpenRAIL 使用限制条款；生成内容的责任在使用者
 
 ## 故障排查
 
@@ -553,8 +512,8 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 | [larryvrh/MiniMax-H3-Turbo-Lora](https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora) | v4-600 Turbo LoRA 权重 |
 | [kijai/ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `PathchSageAttentionKJ` 注意力加速节点（+ `sageattention`） |
 | [matlowai/ComfyUI-MAINodes](https://github.com/matlowai/ComfyUI-MAINodes) | `H3EvictTextEncoder` 编码后卸载文本编码器节点 |
-| [Comfy-Org/comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) | 官方 Comfy MCP Local（容器内安装） |
-| [Comfy-Org/comfy-cli](https://github.com/Comfy-Org/comfy-cli) | comfy-mcp 的底层引擎 |
+| [Comfy-Org/comfy-mcp](https://github.com/Comfy-Org/comfy-mcp) | 官方 Comfy MCP Local（可选：仅宿主侧 pixi 环境，镜像内已不安装） |
+| [Comfy-Org/comfy-cli](https://github.com/Comfy-Org/comfy-cli) | 官方 Comfy MCP Local 的底层引擎（同上，宿主侧可选） |
 | [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp) | 容器内托管 MCP：让 Agent 搭建 / 编辑工作流（Streamable HTTP） |
 | [Saganaki22/ComfyUI-sol-attn](https://github.com/Saganaki22/ComfyUI-sol-attn) | （可选）Sol-Attn 无损加速，支持 SM86（RTX 30 系） |
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |
