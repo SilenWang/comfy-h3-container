@@ -4,9 +4,11 @@
 #
 #   ./scripts/download_models_bg.sh          # 基础模型（约 43GB），默认
 #   ./scripts/download_models_bg.sh extra    # 参考/控制模型（约 25GB）
+#   ./scripts/download_models_bg.sh image    # 二次元插画底模（约 6.9GB）
 #
 #   pixi run models-status             # 查看基础模型下载进度
 #   pixi run models-extra-status       # 查看参考/控制模型下载进度
+#   pixi run models-image-status       # 查看二次元插画底模下载进度
 #   pixi run models-logs               # 跟踪基础模型下载日志
 set -euo pipefail
 
@@ -28,8 +30,14 @@ case "${1:-base}" in
     PIDF="$BUILD_DIR/models_extra.pid"
     STATUS_CMD="pixi run models-extra-status"
     ;;
+  image)
+    SCRIPT="scripts/download_models_image.sh"
+    LOG="$BUILD_DIR/models_image.log"
+    PIDF="$BUILD_DIR/models_image.pid"
+    STATUS_CMD="pixi run models-image-status"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | image）" >&2
     exit 2
     ;;
 esac

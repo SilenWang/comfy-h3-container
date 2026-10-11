@@ -3,6 +3,7 @@
 #
 #   ./scripts/models_status.sh          # 基础模型（默认）
 #   ./scripts/models_status.sh extra    # 参考/控制模型
+#   ./scripts/models_status.sh image    # 二次元插画底模
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,8 +19,13 @@ case "${1:-base}" in
     PIDF="$ROOT/.build/models_extra.pid"
     LABEL="参考/控制模型"
     ;;
+  image)
+    LOG="$ROOT/.build/models_image.log"
+    PIDF="$ROOT/.build/models_image.pid"
+    LABEL="二次元插画底模"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | image）" >&2
     exit 2
     ;;
 esac
@@ -45,5 +51,5 @@ if [[ -f "$LOG" ]]; then
   echo "--- $(basename "$LOG") 末尾 ---"
   tail -n 15 "$LOG"
 else
-  echo "（还没有日志，先运行 pixi run models-bg 或 pixi run models-extra-bg）"
+  echo "（还没有日志，先运行 pixi run models-bg / models-extra-bg / models-image-bg）"
 fi

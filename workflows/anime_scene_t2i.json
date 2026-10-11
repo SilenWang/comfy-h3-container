@@ -1,0 +1,665 @@
+{
+  "id": "d8f76144-efaa-4acd-b102-05ff1813336f",
+  "revision": 0,
+  "last_node_id": 12,
+  "last_link_id": 16,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -2950.0,
+        -200.0
+      ],
+      "size": [
+        560.0,
+        620.0
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "## 二次元场景图（galgame 背景素材）\n\n**先下模型**：`pixi run models-image-bg`（默认 Illustrious XL v2.0，约 6.9GB）\n\n### 用法\n1. 改 `Prompt (Scene)` 里的场景描述 —— Danbooru tag 风格，逗号分隔，`no humans` 保证是纯背景\n2. 尺寸默认 1216×832（SDXL 16:9 原生比例）；竖构图场景改 `EmptyLatentImage` 为 832×1216\n3. Queue，输出在 `output/anime/scene/`\n\n### prompt 骨架\n`masterpiece, best quality, very aesthetic, absurdres, no humans, scenery, <场景>, <时间/天气>, <镜头/光效>, detailed background, anime screencap, visual novel background`\n\n### 常用 tag\n- 场景：`classroom / school hallway / school rooftop / clubroom / library / shrine / shopping district / cafe / beach / bedroom / train station`\n- 时间：`afternoon / sunset / dusk / night / starry sky`\n- 光效：`sunlight through windows, lens flare, bloom, god rays, rim light, backlighting`\n- 构图：`wide shot, from above, depth of field, blurry background`\n\n### 12GB 显存提示\n二段放大（hires）会明显变慢：选中 `LatentUpscale` 与 `KSampler (Hires)` 后按 Ctrl+B 旁路，即可只用 1216×832 出图。"
+      ],
+      "title": "Note: 使用说明（场景图）",
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 2,
+      "type": "MarkdownNote",
+      "pos": [
+        -2950.0,
+        520.0
+      ],
+      "size": [
+        560.0,
+        520.0
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image-bg` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
+      ],
+      "title": "Note: 底模与许可",
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 3,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -2250.0,
+        -200.0
+      ],
+      "size": [
+        400.0,
+        98.0
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3,
+            4
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "illustrious-xl-v2.0.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "PrimitiveInt",
+      "pos": [
+        -2250.0,
+        -60.0
+      ],
+      "size": [
+        300.0,
+        82.0
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            6,
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveInt"
+      },
+      "widgets_values": [
+        123456789,
+        "fixed"
+      ],
+      "title": "Int (Seed)"
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -2250.0,
+        90.0
+      ],
+      "size": [
+        460.0,
+        260.0
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            8,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, very aesthetic, absurdres, no humans, scenery, empty classroom, desks and chairs, blackboard, sunlight through windows, lens flare, dust motes, school, afternoon, detailed background, anime screencap, visual novel background"
+      ],
+      "title": "Prompt (Scene)"
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -2250.0,
+        420.0
+      ],
+      "size": [
+        460.0,
+        260.0
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            9,
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "worst quality, low quality, lowres, bad anatomy, bad hands, extra digits, fewer digits, extra limbs, missing limbs, fused fingers, watermark, signature, username, artist name, text, logo, jpeg artifacts, blurry, sketch, censor bar"
+      ],
+      "title": "Prompt (Negative)"
+    },
+    {
+      "id": 7,
+      "type": "EmptyLatentImage",
+      "pos": [
+        -2250.0,
+        760.0
+      ],
+      "size": [
+        320.0,
+        130.0
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage"
+      },
+      "widgets_values": [
+        1216,
+        832,
+        1
+      ],
+      "title": "Empty Latent (1216x832)"
+    },
+    {
+      "id": 8,
+      "type": "KSampler",
+      "pos": [
+        -1650.0,
+        90.0
+      ],
+      "size": [
+        340.0,
+        262.0
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 8
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 9
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 10
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        123456789,
+        "fixed",
+        28,
+        6.0,
+        "dpmpp_2m",
+        "karras",
+        1.0
+      ],
+      "title": "KSampler (Base)"
+    },
+    {
+      "id": 9,
+      "type": "LatentUpscale",
+      "pos": [
+        -1650.0,
+        430.0
+      ],
+      "size": [
+        340.0,
+        150.0
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LatentUpscale"
+      },
+      "widgets_values": [
+        "bislerp",
+        1824,
+        1248,
+        "disabled"
+      ],
+      "title": "LatentUpscale 1.5x"
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [
+        -1650.0,
+        650.0
+      ],
+      "size": [
+        340.0,
+        262.0
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 4
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 13
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 14
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 12
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        123456789,
+        "fixed",
+        14,
+        5.0,
+        "dpmpp_2m",
+        "karras",
+        0.45
+      ],
+      "title": "KSampler (Hires)"
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [
+        -1150.0,
+        90.0
+      ],
+      "size": [
+        250.0,
+        60.0
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 15
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [
+        -1150.0,
+        210.0
+      ],
+      "size": [
+        480.0,
+        520.0
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "anime/scene"
+      ],
+      "title": "Save (anime/scene)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      1,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      1,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      3,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      3,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      5,
+      3,
+      2,
+      11,
+      1,
+      "VAE"
+    ],
+    [
+      6,
+      4,
+      0,
+      8,
+      4,
+      "INT"
+    ],
+    [
+      7,
+      4,
+      0,
+      10,
+      4,
+      "INT"
+    ],
+    [
+      8,
+      5,
+      0,
+      8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      9,
+      6,
+      0,
+      8,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      10,
+      7,
+      0,
+      8,
+      3,
+      "LATENT"
+    ],
+    [
+      11,
+      8,
+      0,
+      9,
+      0,
+      "LATENT"
+    ],
+    [
+      12,
+      9,
+      0,
+      10,
+      3,
+      "LATENT"
+    ],
+    [
+      13,
+      5,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      6,
+      0,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      15,
+      10,
+      0,
+      11,
+      0,
+      "LATENT"
+    ],
+    [
+      16,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "模型 / 提示词 / 潜空间",
+      "bounding": [
+        -2330.0,
+        -280.0,
+        700.0,
+        1180.0
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "采样 + 二段放大 + 输出",
+      "bounding": [
+        -1730.0,
+        -280.0,
+        1160.0,
+        1260.0
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        1400,
+        900
+      ]
+    }
+  },
+  "version": 0.4
+}
