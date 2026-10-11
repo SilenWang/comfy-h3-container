@@ -232,7 +232,7 @@ pixi run mcp-config host      # 打印带绝对路径的客户端配置
 
 **它以容器内服务运行，由 supervisord 托管、随容器一起启动**（不需要宿主另起进程）：
 
-- 容器内以 **Streamable HTTP** 监听 `0.0.0.0:19100`，`docker-compose.yml` 映射到宿主 `127.0.0.1:9100`。
+- 容器内以 **Streamable HTTP** 监听 `0.0.0.0:19100`，`docker-compose.yml` 映射到宿主 `0.0.0.0:9100`（不写 IP 即绑所有接口，**同机其他容器与局域网都能访问**）。
 - 直连同容器 ComfyUI 的 `127.0.0.1:18188`，绕过 8188 上的 caddy。
 - 日志写 `/var/log/supervisor/comfyui-mcp.log`；ai-dock 的 `logtail` 会把该目录所有日志汇总到容器 stdout，因此 **comfyui / caddy / comfyui-mcp 的日志在 `docker compose logs` 里都能同时看到**。
 
@@ -255,17 +255,53 @@ claude mcp add --transport http comfyui http://<宿主机IP>:9100/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
+#### 谁能连、用什么地址
+
+端口映射绑在**宿主**上，而容器各有独立网络命名空间 —— **容器内的 `127.0.0.1:9100` 是它自己的 loopback，连不到宿主的 9100**（同机其他容器也一样）。按调用方所在位置选地址：
+
+| 调用方 | 端点 | 说明 |
+|---|---|---|
+| 宿主机本机 | `http://127.0.0.1:9100/mcp` | Claude Code / Cursor 跑在宿主上时 |
+| **同机其他容器** | `http://<宿主在该容器网络上的网关IP>:9100/mcp` | 默认 bridge 是 `172.17.0.1`；自定义网络用 `docker network inspect <网络名>` 看 `Gateway`。更省事：给该容器加 `--add-host host.docker.internal:host-gateway`，然后用 `host.docker.internal` |
+| 局域网其他机器 | `http://<宿主机IP>:9100/mcp` | 需防火墙放行 9100 |
+| 与 `comfyui-h3` 同一 docker 网络的容器 | `http://comfyui-h3:19100/mcp` | 走容器网络直连**容器内**端口，不经宿主端口映射，最直接（compose 默认网络名 `<项目名>_default`，`docker network ls` 可查） |
+
+同机其他容器接入示例（`host-gateway` 需要 Docker ≥ 20.10）：
+
+```bash
+docker run --rm --add-host host.docker.internal:host-gateway <你的镜像> \
+  curl -X POST http://host.docker.internal:9100/mcp \
+    -H 'Authorization: Bearer <token>' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+```
+
+客户端配置里把 `url` 换成上表对应那一行即可：
+
+```jsonc
+{
+  "mcpServers": {
+    "comfyui": {
+      "type": "http",
+      "url": "http://host.docker.internal:9100/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
 可配置项：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `COMFYUI_MCP_HTTP_TOKEN` | `comfy-h3-mcp` | 入站鉴权令牌（`Authorization: Bearer` / `X-API-Key`）。**共享到局域网务必改成强随机值** |
-| host 端口映射 | `127.0.0.1:9100:19100` | 改 `docker-compose.yml` 为 `"9100:19100"` 可对局域网开放 |
+| `COMFYUI_MCP_HTTP_TOKEN` | `comfy-h3-mcp` | 入站鉴权令牌（`Authorization: Bearer` / `X-API-Key`）。**端口默认对外开放，务必改成强随机值** |
+| host 端口映射 | `9100:19100` | 绑宿主所有接口（同机其他容器 + 局域网可达）。想收回成只允许宿主机本机：改 `docker-compose.yml` 为 `"127.0.0.1:9100:19100"` |
 | `COMFYUI_MCP_PORT_LOCAL` | `19100` | 容器内监听端口（镜像 ENV） |
 
 > ⚠️ **第三方 + 有限维护**：`artokun/comfyui-mcp` 是社区实现（MIT / Node ≥22），README 标注 limited maintenance，工具面与官方 comfy-cli **不通用**；H3 的 `MiniMaxH3TurboLoRA` / `PathchSageAttentionKJ` / `H3EvictTextEncoder` 这套专用链它也不认识，但能读容器里**实际安装**的 `/object_info`。最稳的用法是把仓库现成的 `workflows/*.json` 当模板喂给 Agent，让它在此基础上改参 / 接线。
 >
-> **安全**：默认只把端口绑到宿主 `127.0.0.1`；要对局域网开放，请先在 `.env` 设强 `COMFYUI_MCP_HTTP_TOKEN`。
+> **安全**：端口默认绑宿主所有接口（`9100:19100`），同机容器与局域网都能连，而鉴权只有 Bearer token —— 默认值 `comfy-h3-mcp` 形同公开。**务必先在 `.env` 里设强随机值**（`openssl rand -hex 16`），且只部署在可信网络；跨不可信网络请套 TLS 反代或走 Tailscale / WireGuard。只想宿主机本机用：把映射改回 `"127.0.0.1:9100:19100"`。
 
 <details>
 <summary>查看 / 管理容器内服务（supervisor）</summary>
@@ -375,7 +411,7 @@ models/
 9. R2V / 动作控制 / 多帧参考需额外约 25GB 模型（`pixi run models-extra-bg`），且 R2V 用的是独立的 `ref2va` 权重（与 T2V/I2V 的 `fl2va` 不通用）；三者需要 ComfyUI ≥ 0.35.0（本镜像构建时拉最新 master，满足）
 10. R2V 的 4 步 Turbo LoRA 会削弱参考约束：人物一致性要求高时请跑 20–25 步（不是 4 步）；`ref_image_size=max` 更准但更慢
 11. Fun ControlNet 依赖 SDPose 姿态提取，长视频 / 多人场景会增加预处理时间，控制强度与步数需按片段调
-12. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认只绑 `127.0.0.1`，对局域网 / 公网开放前务必改强 `COMFYUI_MCP_HTTP_TOKEN`（详见上文「artokun/comfyui-mcp」）
+12. artokun/comfyui-mcp 是第三方实现（limited maintenance），工具面与官方 comfy-cli **不通用**；它由容器内 supervisord 托管，宿主端口默认绑所有接口（`0.0.0.0:9100`，同机其他容器 / 局域网可达），务必先把 `COMFYUI_MCP_HTTP_TOKEN` 改强；只想宿主机本机用可把映射收回 `"127.0.0.1:9100:19100"`（详见上文「artokun/comfyui-mcp」）
 
 ## 故障排查
 
