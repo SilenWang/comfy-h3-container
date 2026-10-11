@@ -18,6 +18,7 @@
 - WebUI + REST API（ComfyUI 原生）
 - 内置 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
 - **二次元生图（galgame 素材）**：内置 3 个 SDXL 动漫底模工作流 —— 场景图（背景）、9 向人物设定表（单图 3×3）、9 向人物分向单图（同 seed 一次出 9 张），配套 `pixi run models-image-bg` 一键下底模，全部是 ComfyUI 原生节点、**不用重建镜像**
+- **修图 / 改图（阿里 Qwen-Image-Edit 2511）**：内置 2 个 GGUF 修图工作流（4 步 Lightning 加速档 / 20 步质量档），中文一句话改图 —— 换背景、改光线、去路人、换装、改图中文字、两图融合；配套 `pixi run models-qwen-edit-bg` 一键下权重（GGUF 量化 + `--lowvram` 让 20B 模型跑在 12GB 显存上）。这条链路多装一个 ComfyUI-GGUF 节点，**需要重建镜像**
 - WebUI 认证可一键关闭（局域网自用、免每次输密码）
 - 模型一键下载脚本（断点续传）
 
@@ -27,7 +28,7 @@
 |---|---|---|
 | GPU | NVIDIA 12GB 显存（RTX 3060 实测） | 24GB+ 显存（更快、可跑更高分辨率） |
 | 系统内存 | 32GB | 64GB（offload 稳定） |
-| 磁盘 | 45GB 可用（二次元生图另加约 7GB） | NVMe SSD |
+| 磁盘 | 45GB 可用（二次元生图另加约 7GB，Qwen 修图另加约 16GB） | NVMe SSD |
 | 软件 | Docker + nvidia-container-toolkit | Linux / WSL2 |
 
 > 非 NVIDIA（AMD ROCm / Apple Silicon）请参考文末的社区方案。
@@ -51,6 +52,9 @@ cp .env.example .env
 
 # 3b.（可选）二次元插画生图底模（约 6.9GB，galgame 场景图 / 9 向人物素材）
 #   pixi run models-image-bg && pixi run models-image-status
+
+# 3c.（可选）Qwen-Image-Edit 修图链路（约 16GB，GGUF 量化、12GB 显存可跑；需重建镜像）
+#   pixi run models-qwen-edit-bg && pixi run models-qwen-edit-status
 
 # 4. 构建并启动
 docker compose up -d --build
@@ -92,6 +96,15 @@ pixi run models-logs     # 实时跟踪 .build/models.log
 > ```
 > 切 HuggingFace 用 `pixi run models-image-hf-bg`。模型只有 6.9GB、CDN 上很快，前台跑 `pixi run models-image` 也可以。用法见下文「生成图片：二次元插画」。
 
+> 想给图片**修图 / 改图**（阿里 Qwen-Image-Edit 2511：中文一句话换背景 / 去路人 / 换装 / 改图中文字 / 两图融合），再下约 16GB 的 GGUF 量化链路：
+> ```bash
+> pixi run models-qwen-edit-bg       # 后台启动（默认魔搭，可断点续传）
+> pixi run models-qwen-edit-status   # 查看进度
+> QWEN_EDIT_QUANT=Q4_K_S pixi run models-qwen-edit-bg        # 画质档更重（12.4GB 主模型）
+> QWEN_EDIT_TEXT_ENC=fp8 pixi run models-qwen-edit-bg        # 文本编码器改用 fp8 safetensors（免 mmproj）
+> ```
+> 切 HuggingFace 用 `pixi run models-qwen-edit-hf-bg`。这条链路**需要重建镜像**（多一个 ComfyUI-GGUF 节点），见下文「修图：Qwen-Image-Edit」。
+
 ### 用外部模型目录（避免每次重新下载）
 
 模型本来就存在挂载卷里，容器重建不会丢。默认落在仓库内的 `./models`；如果想多个项目 / 多台机器共用同一份模型（比如放在 NAS 或大盘上），把 `MODELS_DIR` 指向外部目录即可：
@@ -130,7 +143,7 @@ pixi run up             # 构建完成后启动容器（镜像已就绪，不再
 
 ### 生成视频
 
-1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板。（二次元生图模板 `anime_scene_t2i` / `anime_character_sheet` / `anime_character_9views` 见下文「生成图片」）
+1. WebUI 左侧 **Workflows** 选仓库自带模板：`minimax_h3_t2v_bund`（文生视频）/ `minimax_h3_i2v`（图生视频）/ `minimax_h3_r2v`（参考生视频）/ `minimax_h3_fun_controlnet_union`（动作控制）/ `minimax_h3_multiframe_reference`（多帧参考）；也可从 **Template Library → Video** 选官方 H3 模板。（二次元生图模板 `anime_scene_t2i` / `anime_character_sheet` / `anime_character_9views` 见下文「生成图片」；Qwen 修图模板 `qwen_image_edit_gguf_lightning` / `qwen_image_edit_gguf` 见下文「修图」）
 2. 点 Queue 执行，等待输出（右侧 Video 面板可预览/下载）
 3. 输出文件同时保存在宿主的 `./output/` 目录
 
@@ -268,6 +281,103 @@ masterpiece, best quality, very aesthetic, absurdres, no humans, scenery,
 想加风格 / 画师 LoRA：把 `.safetensors` 放进 `models/loras/`，在 WebUI 里拖一个 `Load LoRA` 节点插在 `Load Checkpoint` 和 `KSampler` 之间（`model` / `clip` 各接一条线），再刷新节点列表选文件即可。
 
 > 也可以让 Agent 出图：这些工作流就是普通 ComfyUI 工作流，接上容器的 artokun MCP 后，Agent 能直接改提示词与尺寸并批量跑。
+
+## 修图：Qwen-Image-Edit（阿里指令式改图，GGUF / 12GB 可跑）
+
+前面两节的 SDXL 链路只会「凭空出图」（文生图）。要**改一张已有的图** —— 换背景、改光线、去路人、换装、换材质、改图中文字、两张图融合 —— 用阿里 **Qwen-Image-Edit-2511**：给一张图 + 一句中文指令，它按指令重画这张图，同时尽量保住原图的人物、构图与风格。做游戏素材时返修立绘 / 场景图最省事。
+
+| 工作流 | 采样参数 | 用途 |
+|---|---|---|
+| `qwen_image_edit_gguf_lightning.json` | 4 步 / CFG 1.0（Lightning 4 步 LoRA） | **批量出素材推荐**，一次采样快得多 |
+| `qwen_image_edit_gguf.json` | 20 步 / CFG 4.0 | 质量档，无 LoRA，最接近官方权重行为 |
+
+两个工作流都在画布左上角贴了 `MarkdownNote`（用法 / 指令示例 / 12GB 提示），接线一致：`Load Image` → 指令 → `KSampler` → `Save Image`，输出在 `output/qwen_edit/`。
+
+### 1. 为什么这条链路要重建镜像（本仓库唯一需要重建镜像的生图功能）
+
+Qwen-Image-Edit-2511 是 **20B** 模型，Comfy-Org 官方权重 fp8/int8 就有 20.5GB、bf16 40.9GB —— **12GB 显存装不下**，显存不够时连加载都会 OOM。低显存只有一条现实的路：**GGUF 量化**（Q3_K_S 9.2GB / Q4_K_S 12.4GB）+ 镜像里已经默认开启的 `--lowvram` + CPU offload。
+
+GGUF 需要 `ComfyUI-GGUF` 自定义节点（提供 `Unet Loader (GGUF)` / `CLIPLoader (GGUF)`），所以本次在 Dockerfile 里加了一步 clone（顺带装了 `gguf` / `sentencepiece` / `protobuf` 依赖）：
+
+```bash
+pixi run build && pixi run build-status   # 或直接：pixi run up-build
+pixi run up
+```
+
+> 「纯 fp8/int8、不重建镜像」也能接，但那是给 16GB+ 显存的方案：把官方 `qwen_image_edit_2511_fp8mixed.safetensors`（20.5GB）+ `qwen_2.5_vl_7b_fp8_scaled.safetensors`（9.4GB）放好，用原生 `Unet Loader` / `CLIP Loader` 即可，本仓库不放这类工作流。
+
+### 2. 下载权重（约 16GB）
+
+```bash
+pixi run models-qwen-edit-bg       # 后台下载（默认魔搭，可断点续传）
+pixi run models-qwen-edit-status   # 查看进度
+pixi run models-qwen-edit-logs     # 跟踪日志
+```
+
+下什么、放哪：
+
+| 文件 | 大小 | 目录 | 用途 |
+|---|---|---|---|
+| `qwen-image-edit-2511-Q3_K_S.gguf` | 9.2GB | `diffusion_models/` | 主模型（默认量化档） |
+| `Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf` | 4.7GB | `text_encoders/` | 文本编码器（懂中文指令） |
+| `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf` | 1.3GB | `text_encoders/` | 上面这个编码器的**视觉塔**，缺了会坏 |
+| `qwen_image_vae.safetensors` | 0.25GB | `vae/` | VAE |
+| `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` | 0.81GB | `loras/` | 4 步加速 LoRA |
+
+> **mmproj 是这条链路最容易踩的坑**：ComfyUI-GGUF 加载 `qwen2vl` 文本编码器时，会在同目录按「文件名包含编码器基名」的规则找 `mmproj*.gguf`。上游 unsloth 的文件名就叫 `mmproj-F16.gguf`（不含模型名），匹配不上就会在日志里刷 `Can't find mmproj file ... Qwen-Image-Edit will be broken!`、参考图被当成没有。下载脚本已经把它落盘成 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`，不用手动改。
+
+量化档按显存 / 内存挑（`QWEN_EDIT_QUANT=... pixi run models-qwen-edit-bg`）：
+
+| 档位 | 主模型 | 说明 |
+|---|---|---|
+| `Q3_K_S`（默认） | 9.2GB | 12GB 显存上最稳，质量够做素材返修 |
+| `Q4_0` / `Q4_K_S` | 11.9 / 12.4GB | 画质更好，更吃内存与 offload，速度更慢 |
+| `Q5_K_M` / `Q6_K` | 15.0 / 16.9GB | 16GB+ 显存再考虑 |
+
+### 3. 怎么用
+
+1. WebUI 左侧 **Workflows** 选 `qwen_image_edit_gguf_lightning`（快）或 `qwen_image_edit_gguf`（质量）
+2. 点 `图 1：要修改的图` 的 upload，选一张图
+3. 在 `修改指令（中文即可）` 里写一句话
+4. 点 Queue，输出在 `output/qwen_edit/edited_*.png`
+
+指令直接写中文就行（文本编码器是 Qwen2.5-VL）。几个实测好用的句式：
+
+| 想要的效果 | 指令写法 |
+|---|---|
+| 换光线 / 时段 | `把白天改成黄昏，加暖色逆光，其它保持不变` |
+| 去杂物 / 去路人 | `去掉左下角的路人，保持背景连续` |
+| 换装 / 换配色 | `把校服换成红色夹克，保留角色长相与姿势` |
+| 改图中文字 | `把招牌上的文字改成 OPEN，字体风格不变` |
+| 换画风 | `改成 90 年代赛璐璐动画上色风格` |
+| 两图融合 | 把 `图 2` 的输出拖到两个 `Text Encode Qwen Image Edit Plus` 的 `image2`，指令写 `把图 1 的沙发材质换成图 2 的毛皮材质` |
+
+**换姿势 / 换角度、需要严格构图控制时它不擅长**：那是 SDXL + ControlNet（OpenPose）的活；纯去杂物 / 修手也可以先用 SDXL 的 inpaint 链路（零下载），按需挑。
+
+### 4. 12GB 显存上的预期与调参
+
+- 首次 Queue 要加载 9.2GB 主模型 + 4.7GB 文本编码器再 offload，**加载阶段就慢**，属正常
+- 出图速度：20B 模型在 12GB 卡上比 SDXL 慢一个量级。批量做素材用 Lightning 4 步档；质量档（20 步）留给单张精修
+- 内存：`docker-compose.yml` 里 `memory: 24G` 对 9.2GB 主模型 + 文本编码器的 offload 偏紧，跑不动先把这个上限调高（`.env` 或 compose 里改）
+- `--lowvram` 已在镜像默认参数里，**不要**改成 `--gpu-only`
+- 画质档想再提：把 KSampler 步数从 20 提到 40（官方 Qwen 推荐值），速度更慢
+
+> 这一节的具体耗时数字**本仓库没有 12GB 显卡上的实测**：链路、权重、参数都按官方 2511 模板与 ComfyUI 源码核对过（节点名、接线、量化档大小），但速度与稳定性请以你自己机器为准；跑不动先降量化档（`QWEN_EDIT_QUANT=Q3_K_S`）、调高内存上限。
+
+### 5. 换 fp8 文本编码器（可选，免 mmproj）
+
+不想用 GGUF 文本编码器（或想对比效果）：
+
+```bash
+QWEN_EDIT_TEXT_ENC=fp8 pixi run models-qwen-edit-bg   # 额外下 9.4GB qwen_2.5_vl_7b_fp8_scaled.safetensors
+# 或两种都下：QWEN_EDIT_TEXT_ENC=both
+```
+
+然后把工作流里的 `CLIPLoader (GGUF)` 换成原生 `CLIP Loader`（type 仍选 `qwen_image`），选中 `qwen_2.5_vl_7b_fp8_scaled.safetensors` 即可 —— 原生加载器不需要 mmproj，但显存占用更大。
+
+### 6. 许可
+
+Qwen-Image-Edit-2511 及本链路用到的 GGUF 量化（unsloth）、Lightning LoRA（lightx2v）、文本编码器（Qwen2.5-VL-7B）**均为 Apache-2.0，允许商用**（含游戏素材），需随附许可副本并遵守其条款；生成内容责任在使用者。权重来源：[Qwen/Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511)、[unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF)、[lightx2v/Qwen-Image-Edit-2511-Lightning](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning)、[Comfy-Org/Qwen-Image_ComfyUI](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI)（魔搭同名仓库亦可，脚本默认走魔搭）。
 
 ## AI 辅助：用 MCP 驱动 ComfyUI（本地 / 远程）
 
@@ -420,6 +530,11 @@ models/
 ├── loras/minimax_h3_turbo_v4_step600_ema.safetensors                    0.78 GB（推荐）
 ├── checkpoints/illustrious-xl-v2.0.safetensors                          6.94 GB（二次元生图底模，默认）
 ├── checkpoints/animagine-xl-4.0.safetensors                             6.94 GB（二次元生图底模，可选）
+├── diffusion_models/qwen-image-edit-2511-Q3_K_S.gguf                    9.22 GB（Qwen 修图主模型，GGUF，可选）
+├── text_encoders/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf                     4.68 GB（Qwen 修图文本编码器，可选）
+├── text_encoders/Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf                 1.35 GB（视觉塔，缺了 Qwen 修图会坏）
+├── vae/qwen_image_vae.safetensors                                       0.25 GB（Qwen 修图 VAE）
+├── loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors    0.81 GB（Qwen 修图 4 步加速，可选）
 ├── diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors  19.53 GB（R2V，额外）
 ├── loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors     1.82 GB（R2V Turbo，额外）
 ├── model_patches/minimax_h3_fun_controlnet_union_pruned_int8_convrot…  2.14 GB（动作控制，额外）
@@ -427,7 +542,7 @@ models/
 └── diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors                 0.12 GB（SDPose 检测器，额外）
 ```
 
-> 两个二次元生图底模（约 6.9GB/个）用 `pixi run models-image-bg` 下载，只做 T2V / I2V 不必装；上面最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra-bg` 下载。
+> 两个二次元生图底模（约 6.9GB/个）用 `pixi run models-image-bg` 下载，只做 T2V / I2V 不必装；Qwen 修图那 5 项（约 16GB）用 `pixi run models-qwen-edit-bg` 下载，只做视频 / 文生图不必装；上面最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra-bg` 下载。
 
 ## 📊 实测性能（RTX 3060 12GB）
 
@@ -458,6 +573,13 @@ models/
 13. SDXL 对精确 45° 视角控制有限：正面 / 侧面 / 背面最稳，3/4 向常需重抽，严格角度要靠 ControlNet (OpenPose)；`anime_character_9views` 里 9 张共用 seed 也不等于像素级同一张脸，一致性要求高时请提高步数 / CFG 并多抽几组挑选
 14. 二次元底模许可：Illustrious XL v2.0 = CreativeML OpenRAIL-M，Animagine XL 4.0 = OpenRAIL++-M，**允许商用**（含 galgame 素材）但须随附许可副本、保留出处声明并遵守 OpenRAIL 使用限制条款；生成内容的责任在使用者
 
+15. Qwen 修图链路（`workflows/qwen_image_edit_gguf*.json`）**需要重建镜像**：它依赖本次新加的 ComfyUI-GGUF 节点（`Unet Loader (GGUF)` / `CLIPLoader (GGUF)`），旧镜像打开这两个工作流会报缺节点；工作流还用到 `TextEncodeQwenImageEditPlus` / `CFGNorm` / `FluxKontextImageScale`（本镜像构建时拉最新 master，满足）
+16. Qwen 修图走 GGUF 量化，属**有损压缩**：默认 Q3_K_S（9.2GB）省显存，细节与图中文字偶尔会糊；要求高时换 `QWEN_EDIT_QUANT=Q4_K_S`（12.4GB，更慢、更吃内存）
+17. Qwen 修图在 12GB 卡上的**耗时本仓库未实测**（链路、节点接线、量化档大小按官方 2511 模板 + ComfyUI 源码核对过）；20B 模型首次加载 9.2GB 主模型 + 4.7GB 文本编码器本身就慢，批量出素材请用 4 步 Lightning 档
+18. Qwen 修图的文本编码器走 GGUF 时，`text_encoders/` 里必须有匹配的 mmproj（视觉塔）：下载脚本已把上游 `mmproj-F16.gguf` 重命名成 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`。手动改文件名 / 换编码器量化档后如果日志出现 `Can't find mmproj file ... Qwen-Image-Edit will be broken!`，就是这条规则没满足（参考图会被忽略）
+19. Lightning LoRA 叠在 GGUF 量化主模型上的效果**本仓库未实测**（ComfyUI-GGUF 对 LoRA 的支持官方标注为 experimental）：若日志报 LoRA 相关错误或画面异常，把 `4 步加速 LoRA` 节点的 `strength_model` 设 0，并把 KSampler 改回 `steps=20, cfg=4.0`（质量档参数），流程仍可跑
+20. Qwen 修图的许可：Qwen-Image-Edit-2511、unsloth 的 GGUF 量化、lightx2v 的 Lightning LoRA、Qwen2.5-VL-7B 文本编码器**均为 Apache-2.0，允许商用**（含游戏素材），须随附许可副本并遵守其条款；生成内容责任在使用者
+
 ## 故障排查
 
 ### `PathchSageAttentionKJ` 报 `ModuleNotFoundError: No module named 'sageattention'`
@@ -483,6 +605,33 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 
 > 现版本 Dockerfile 已改用 codeload tarball + 重试来拉源码，并先装 PyPI V1 兜底、编译后校验 import，不会再出现"构建成功却漏装"的静默失败。
 
+### Qwen 修图：工作流报缺节点 / 输出不按指令改
+
+**现象 A**：打开 `qwen_image_edit_gguf*.json` 时节点框红、提示缺失节点（`UnetLoaderGGUF` / `CLIPLoaderGGUF`）。
+
+**根因**：镜像是旧版，没装 ComfyUI-GGUF 节点。
+
+**修复**：重建镜像（`pixi run build && pixi run up`；Dockerfile 里已有 clone + `pip install -r requirements.txt`）。确认方式：
+
+```bash
+docker exec comfyui-h3 ls /opt/ComfyUI/custom_nodes/ComfyUI-GGUF
+docker exec comfyui-h3 /opt/environments/python/comfyui/bin/python -c "import gguf; print(gguf.__version__)"
+```
+
+**现象 B**：工作流能跑完，但输出几乎等于原图（指令没生效）。
+
+**根因**：GGUF 文本编码器的视觉塔（mmproj）没被找到。ComfyUI-GGUF 按「文件名包含编码器基名（去掉量化后缀）」匹配 mmproj，匹配不上就把参考图当没有。日志（`pixi run logs`）里会有：
+
+```
+Can't find mmproj file for 'Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf' (matching:'qwen2.5-vl-7b-instruct')! Qwen-Image-Edit will be broken!
+```
+
+**修复**：确认 `models/text_encoders/` 下有 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`（文件名必须含 `Qwen2.5-VL-7B-Instruct`）。缺了就跑 `pixi run models-qwen-edit-bg` 补下；自己从上游下载的话记得把 `mmproj-F16.gguf` 重命名成这个名字。
+
+**现象 C**：Queue 后长时间卡在加载，或报 OOM / 容器被杀。
+
+**修复**：降量化档（`QWEN_EDIT_QUANT=Q3_K_S pixi run models-qwen-edit-bg`，默认就是它）、调高 `docker-compose.yml` 里的 `memory` 上限、确认 `COMFYUI_ARGS` 带 `--lowvram`（默认带）。首次加载 9.2GB 主模型 + 4.7GB 文本编码器本身就慢，先等一次完整加载。
+
 ## 参考项目与致谢
 
 本项目为以下开源项目的整合与容器化封装，**衷心感谢**各项目作者：
@@ -503,6 +652,11 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 | [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) | 4 步蒸馏 LoRA 参考 |
 | [OnomaAIResearch/Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0) | 二次元生图默认底模（SDXL 动漫 checkpoint） |
 | [cagliostrolab/animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0) | 二次元生图备用底模（插画质感 / 光影） |
+| [city96/ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | GGUF 量化加载节点（`Unet Loader (GGUF)` / `CLIPLoader (GGUF)`），让 Qwen-Image-Edit 跑进 12GB 显存 |
+| [Qwen/Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511) | 修图主模型（阿里指令式图像编辑，Apache-2.0） |
+| [unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) · [unsloth/Qwen2.5-VL-7B-Instruct-GGUF](https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF) | 修图链路 GGUF 量化权重（主模型 + 文本编码器 + mmproj） |
+| [lightx2v/Qwen-Image-Edit-2511-Lightning](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) | 4 步加速 LoRA（20 步 → 4 步） |
+| [Comfy-Org/Qwen-Image_ComfyUI](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI) | Qwen-Image VAE / fp8 文本编码器权重 |
 
 ## License
 
@@ -510,3 +664,4 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 - ComfyUI / ai-dock / 各插件：遵循其各自开源许可证
 - MiniMax H3 模型权重：MiniMax H3 Community License（注意地区限制）
 - 二次元生图底模权重：Illustrious XL v2.0（CreativeML OpenRAIL-M）/ Animagine XL 4.0（OpenRAIL++-M），允许商用，须遵守各自许可的使用限制条款
+- Qwen-Image-Edit-2511 修图链路权重（主模型、GGUF 量化、Lightning LoRA、Qwen2.5-VL 文本编码器）：Apache-2.0，允许商用（含游戏素材），须随附许可副本并遵守其条款

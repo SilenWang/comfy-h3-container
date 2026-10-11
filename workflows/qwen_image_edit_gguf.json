@@ -1,0 +1,765 @@
+{
+  "id": "5f2c9a71-3e64-4b8d-a0c9-7d14e6b32f88",
+  "revision": 0,
+  "last_node_id": 15,
+  "last_link_id": 18,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -3120,
+        -220
+      ],
+      "size": [
+        560,
+        1180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "title": "Note: 用法",
+      "widgets_values": [
+        "## Qwen-Image-Edit 2511 · 指令式修图（GGUF，12GB 显存可跑）\n\n**先下模型**：`pixi run models-qwen-edit-bg`（约 16GB：GGUF 主模型 + Qwen2.5-VL 文本编码器 + mmproj + VAE + Lightning 4 步 LoRA）\n\n### 用法\n1. `图 1：要修改的图` → 点 upload 选一张图（立绘 / 场景 / UI 都行）\n2. `修改指令（中文即可）` → 写一句话，例如：\n   - `把白天改成黄昏，加暖色逆光`\n   - `去掉左下角的路人`\n   - `把校服换成红色夹克，其它保持不变`\n   - `把图中的招牌文字改成 OPEN`\n3. Queue，输出在 `output/qwen_edit/edited_*.png`\n\n### 两张图 = 融合 / 换材质（可选）\n`图 2：可选参考图` 默认**不接线**（不接就是单图编辑，上传图 1 后直接 Queue 即可）。要用第二张图时，把它\n的 `IMAGE` 输出拖到两个 `Text Encode Qwen Image Edit Plus` 节点的 `image2` 输入上（image3 同理），\n指令写成跨图描述，例如「把图 1 的沙发材质换成图 2 的毛皮材质」。\n\n### 12GB 显存提示\n- 镜像默认 `--lowvram` + CPU offload：主模型 Q3_K_S 9.2GB 也放不满显存，**首次 Queue 加载慢是正常的**\n- 20B 模型在 12GB 卡上出图比 SDXL 慢得多，批量做素材请用 `qwen_image_edit_gguf_lightning.json`（4 步）\n- 画质优先：`QWEN_EDIT_QUANT=Q4_K_S pixi run models-qwen-edit-bg` 换 12.4GB 量化档（更慢，需更多内存）\n- 内存上限见 `docker-compose.yml` 的 `memory: 24G`；跑不动就调高它\n\n### 换成 fp8 文本编码器（可选）\n`QWEN_EDIT_TEXT_ENC=fp8 pixi run models-qwen-edit-bg` 会额外下 9.4GB 的 `qwen_2.5_vl_7b_fp8_scaled.safetensors`；\n把 `CLIPLoader (GGUF)` 换成原生 `CLIP Loader`（type 仍选 `qwen_image`）并选中该文件即可，无需 mmproj。\n\n### 参考\n- 模型：[Comfy-Org/Qwen-Image-Edit_ComfyUI](https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI)、[unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF)（魔搭同名仓库）\n- 官方模板：`Template Library → Image → Qwen-Image-Edit 2511`\n\n### 本工作流参数（质量档）\n- KSampler：**20 步 / CFG 4.0 / euler / simple**（官方推荐 Qwen 40 步、Comfy 20 步，12GB 上先用 20 步）\n- 无 LoRA、无加速节点：慢但最接近官方权重行为；速度优先请用 Lightning 档"
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 2,
+      "type": "UnetLoaderGGUF",
+      "pos": [
+        -2480,
+        -220
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UnetLoaderGGUF"
+      },
+      "title": "模型：Qwen-Image-Edit 2511 (GGUF)",
+      "widgets_values": [
+        "qwen-image-edit-2511-Q3_K_S.gguf"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoaderGGUF",
+      "pos": [
+        -2480,
+        -60
+      ],
+      "size": [
+        400,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            4,
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoaderGGUF"
+      },
+      "title": "文本编码器：Qwen2.5-VL-7B (GGUF)",
+      "widgets_values": [
+        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+        "qwen_image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        -2480,
+        100
+      ],
+      "size": [
+        400,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            5,
+            8,
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "title": "VAE",
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -2000,
+        -220
+      ],
+      "size": [
+        360,
+        380
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "图 1：要修改的图",
+      "widgets_values": [
+        "qwen_edit_input.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "pos": [
+        -2000,
+        220
+      ],
+      "size": [
+        360,
+        380
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "图 2：可选参考图（需要时把输出拖到两个 Text Encode 的 image2）",
+      "widgets_values": [
+        "qwen_edit_ref.png",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "FluxKontextImageScale",
+      "pos": [
+        -1580,
+        -220
+      ],
+      "size": [
+        280,
+        46
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            6,
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextImageScale"
+      },
+      "title": "缩放到 Kontext 最优尺寸",
+      "widgets_values": []
+    },
+    {
+      "id": 8,
+      "type": "VAEEncode",
+      "pos": [
+        -1580,
+        -120
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1580,
+        0
+      ],
+      "size": [
+        400,
+        180
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "shape": 7,
+          "link": 5
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": 6
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "修改指令（中文即可）",
+      "widgets_values": [
+        "把白天改成黄昏，加暖色逆光，其它保持不变"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1580,
+        420
+      ],
+      "size": [
+        400,
+        180
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "shape": 7,
+          "link": 8
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": 9
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "负向提示词（保持空）",
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 11,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        -1080,
+        -220
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "title": "Model Sampling (shift 3.1)",
+      "widgets_values": [
+        3.1
+      ]
+    },
+    {
+      "id": 12,
+      "type": "CFGNorm",
+      "pos": [
+        -1080,
+        -100
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CFGNorm"
+      },
+      "title": "CFG Norm",
+      "widgets_values": [
+        1,
+        false
+      ]
+    },
+    {
+      "id": 13,
+      "type": "KSampler",
+      "pos": [
+        -600,
+        -220
+      ],
+      "size": [
+        340,
+        262
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 12
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 13
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 14
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "title": "KSampler (20 步)",
+      "widgets_values": [
+        123456789,
+        "randomize",
+        20,
+        4.0,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 14,
+      "type": "VAEDecode",
+      "pos": [
+        -120,
+        -220
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 16
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [
+        -120,
+        -100
+      ],
+      "size": [
+        480,
+        520
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 18
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "title": "Save (qwen_edit)",
+      "widgets_values": [
+        "qwen_edit/edited"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      5,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      4,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      4,
+      3,
+      0,
+      9,
+      0,
+      "CLIP"
+    ],
+    [
+      5,
+      4,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
+      6,
+      7,
+      0,
+      9,
+      2,
+      "IMAGE"
+    ],
+    [
+      7,
+      3,
+      0,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      8,
+      4,
+      0,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      9,
+      7,
+      0,
+      10,
+      2,
+      "IMAGE"
+    ],
+    [
+      10,
+      2,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      11,
+      11,
+      0,
+      12,
+      0,
+      "MODEL"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      9,
+      0,
+      13,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      10,
+      0,
+      13,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      15,
+      8,
+      0,
+      13,
+      3,
+      "LATENT"
+    ],
+    [
+      16,
+      13,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      17,
+      4,
+      0,
+      14,
+      1,
+      "VAE"
+    ],
+    [
+      18,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        1800,
+        700
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -4,6 +4,7 @@
 #   ./scripts/models_status.sh          # 基础模型（默认）
 #   ./scripts/models_status.sh extra    # 参考/控制模型
 #   ./scripts/models_status.sh image    # 二次元插画底模
+#   ./scripts/models_status.sh qwen-edit # Qwen-Image-Edit 修图链路（GGUF）
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,8 +25,13 @@ case "${1:-base}" in
     PIDF="$ROOT/.build/models_image.pid"
     LABEL="二次元插画底模"
     ;;
+  qwen-edit)
+    LOG="$ROOT/.build/models_qwen_edit.log"
+    PIDF="$ROOT/.build/models_qwen_edit.pid"
+    LABEL="Qwen-Image-Edit 修图链路"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra | image）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | image | qwen-edit）" >&2
     exit 2
     ;;
 esac
@@ -42,7 +48,7 @@ fi
 
 echo "--- 模型目录：$MODELS ---"
 shopt -s nullglob
-for f in "$MODELS"/*/*.safetensors; do
+for f in "$MODELS"/*/*.safetensors "$MODELS"/*/*.gguf; do
   printf '%10s  %s\n' "$(du -h "$f" | cut -f1)" "$(basename "$f")"
 done
 shopt -u nullglob
@@ -51,5 +57,5 @@ if [[ -f "$LOG" ]]; then
   echo "--- $(basename "$LOG") 末尾 ---"
   tail -n 15 "$LOG"
 else
-  echo "（还没有日志，先运行 pixi run models-bg / models-extra-bg / models-image-bg）"
+  echo "（还没有日志，先运行 pixi run models-bg / models-extra-bg / models-image-bg / models-qwen-edit-bg）"
 fi

@@ -50,6 +50,17 @@ models-image-status = { cmd = "bash scripts/models_status.sh image", description
 models-image-logs = { cmd = "tail -f .build/models_image.log", description = "跟踪二次元插画底模下载日志" }
 models-image-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_image.sh", description = "从 HuggingFace 下载二次元插画底模（约 6.9GB）" }
 models-image-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh image", description = "后台从 HuggingFace 下载二次元插画底模（可断点续传）" }
+# Qwen-Image-Edit 修图链路（阿里指令式改图，GGUF 量化，约 16GB）——
+# 对应工作流 workflows/qwen_image_edit_gguf_lightning.json（4 步）/ qwen_image_edit_gguf.json（20 步），
+# 用法见 README「修图：Qwen-Image-Edit」。GGUF 让 20B 模型能跑在 12GB 显存上；文本编码器
+# 默认走 Qwen2.5-VL-7B GGUF + mmproj（脚本已按 ComfyUI-GGUF 的匹配规则重命名）。
+# 换量化档：QWEN_EDIT_QUANT=Q4_K_S（画质更好、更慢）；文本编码器换 fp8：QWEN_EDIT_TEXT_ENC=fp8。
+models-qwen-edit = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_qwen_edit.sh", description = "下载 Qwen-Image-Edit 修图链路权重（GGUF，约 16GB，默认魔搭）" }
+models-qwen-edit-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh qwen-edit", description = "后台下载 Qwen-Image-Edit 修图链路权重（约 16GB，默认魔搭，可断点续传）" }
+models-qwen-edit-status = { cmd = "bash scripts/models_status.sh qwen-edit", description = "查看 Qwen-Image-Edit 修图链路下载进度" }
+models-qwen-edit-logs = { cmd = "tail -f .build/models_qwen_edit.log", description = "跟踪 Qwen-Image-Edit 修图链路下载日志" }
+models-qwen-edit-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_qwen_edit.sh", description = "从 HuggingFace 下载 Qwen-Image-Edit 修图链路权重（约 16GB）" }
+models-qwen-edit-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh qwen-edit", description = "后台从 HuggingFace 下载 Qwen-Image-Edit 修图链路权重（可断点续传）" }
 
 # ── Comfy MCP ───────────────────────────────────────────────────────────
 # 只有第三方 artokun MCP 这一套（supervisord 托管，Streamable HTTP，宿主 9100）：

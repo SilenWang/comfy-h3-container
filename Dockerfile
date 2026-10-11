@@ -95,6 +95,36 @@ RUN for repo in \
                       /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
 
 # ---------------------------------------------------------------
+# 3c. GGUF 量化支持插件：让 20B 的 Qwen-Image-Edit（阿里指令式修图）能跑在 12GB 显存上
+#     https://github.com/city96/ComfyUI-GGUF
+#     - 提供 `Unet Loader (GGUF)` / `CLIPLoader (GGUF)`。ComfyUI-GGUF 的 IMG_ARCH_LIST
+#       含 `qwen_image`、TXT_ARCH_LIST 含 `qwen2vl`，所以 Qwen-Image-Edit 主模型与
+#       Qwen2.5-VL-7B 文本编码器都能吃 GGUF 量化权重（fp8 主模型 20.5GB 装不进 12GB）。
+#       它把自定义 key（unet_gguf / clip_gguf）指向 diffusion_models / text_encoders 的
+#       搜索路径，所以权重仍放挂载卷里已映射的那两个目录，不需要额外映射。
+#     - 文本编码器用 Qwen2.5-VL GGUF 时**必须同目录放一份 mmproj*.gguf**（视觉塔）：节点
+#       按「文件名包含编码器基名」匹配，匹配不到会在日志里报
+#       "Can't find mmproj file ... Qwen-Image-Edit will be broken"。
+#       scripts/download_models_qwen_edit.sh 已把上游的 mmproj-F16.gguf 重命名成
+#       Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf 以满足该规则。
+#     - 依赖 gguf>=0.13.0；sentencepiece / protobuf 是 requirements 里的可选项（GGUF
+#       tokenizer 兜底），一并装上以免个别权重走 tokenizer 重建路径时报缺依赖。
+#       工作流：workflows/qwen_image_edit_gguf*.json，用法见 README「修图：Qwen-Image-Edit」。
+# ---------------------------------------------------------------
+RUN for i in 1 2 3 4 5; do \
+        git clone --depth 1 https://github.com/city96/ComfyUI-GGUF \
+          /opt/ComfyUI/custom_nodes/ComfyUI-GGUF && break; \
+        rm -rf /opt/ComfyUI/custom_nodes/ComfyUI-GGUF; \
+        echo "git clone ComfyUI-GGUF 重试 $i ..."; sleep 5; \
+    done && \
+    test -d /opt/ComfyUI/custom_nodes/ComfyUI-GGUF/.git && \
+    bash -c "source /opt/environments/python/comfyui/bin/activate && \
+        pip install --no-cache-dir -r /opt/ComfyUI/custom_nodes/ComfyUI-GGUF/requirements.txt && \
+        pip install --no-cache-dir sentencepiece protobuf" && \
+    chown -R 1000:1111 /opt/ComfyUI/custom_nodes/ComfyUI-GGUF
+
+# ---------------------------------------------------------------
+
 # 注：容器内只保留第三方 artokun MCP（下一节）。
 #    官方 Comfy MCP Local（Comfy-Org/comfy-mcp，stdio；客户端靠
 #    `docker exec -i comfyui-h3 comfy-mcp` 每次现起进程）已按使用反馈从镜像中

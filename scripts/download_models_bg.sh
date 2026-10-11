@@ -5,10 +5,12 @@
 #   ./scripts/download_models_bg.sh          # 基础模型（约 43GB），默认
 #   ./scripts/download_models_bg.sh extra    # 参考/控制模型（约 25GB）
 #   ./scripts/download_models_bg.sh image    # 二次元插画底模（约 6.9GB）
+#   ./scripts/download_models_bg.sh qwen-edit # Qwen-Image-Edit 修图链路（GGUF，约 16GB）
 #
 #   pixi run models-status             # 查看基础模型下载进度
 #   pixi run models-extra-status       # 查看参考/控制模型下载进度
 #   pixi run models-image-status       # 查看二次元插画底模下载进度
+#   pixi run models-qwen-edit-status   # 查看 Qwen-Image-Edit 修图链路下载进度
 #   pixi run models-logs               # 跟踪基础模型下载日志
 set -euo pipefail
 
@@ -36,8 +38,14 @@ case "${1:-base}" in
     PIDF="$BUILD_DIR/models_image.pid"
     STATUS_CMD="pixi run models-image-status"
     ;;
+  qwen-edit)
+    SCRIPT="scripts/download_models_qwen_edit.sh"
+    LOG="$BUILD_DIR/models_qwen_edit.log"
+    PIDF="$BUILD_DIR/models_qwen_edit.pid"
+    STATUS_CMD="pixi run models-qwen-edit-status"
+    ;;
   *)
-    echo "未知的模型集：${1}（可选：base | extra | image）" >&2
+    echo "未知的模型集：${1}（可选：base | extra | image | qwen-edit）" >&2
     exit 2
     ;;
 esac
