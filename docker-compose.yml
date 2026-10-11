@@ -3,7 +3,7 @@
 #
 # 用法：
 #   cp .env.example .env           # 认证等配置（默认已关闭密码）
-#   ./scripts/download_models.sh   # 下载模型（约 43GB）
+#   pixi run models                # 下载模型（魔搭源，约 43GB；= ./scripts/download_models.sh）
 #   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
@@ -25,7 +25,7 @@ services:
       # artokun MCP（容器内 supervisor 托管，Streamable HTTP）映射到宿主。
       # 绑 0.0.0.0（不写 IP 即全部接口）：同机其他容器与局域网都能访问。
       #   同机其他容器不能用 127.0.0.1（那是容器自己的 loopback），要用宿主 IP 或
-      #   `--add-host host.docker.internal:host-gateway`（详见 README）。
+      #   `--add-host host.docker.internal:host-gateway`（详见 docs/mcp.md）。
       # 想收回成只允许宿主机本机访问：在 .env 里设 COMFYUI_MCP_PORT_HOST=127.0.0.1:9100。
       # 两端端口都可用 .env 覆盖，此处保证「宿主 : 容器」始终对齐：
       #   COMFYUI_MCP_PORT_HOST（宿主，默认 9100）/ COMFYUI_MCP_PORT_LOCAL（容器内，默认 19100）

@@ -24,7 +24,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 9 向人物素材（分向单图 × 9）\n\n**先下模型**：`pixi run models-image-bg`（默认 Illustrious XL v2.0，约 6.9GB）\n\n一次出 **9 张独立图片**：8 个方向的全身图 + 1 张正面半身特写。9 个采样器共用同一个 seed 与同一份潜空间噪声，只换视角提示词，所以人物一致性最好，出来的 PNG 可以直接当立绘 / 设定素材或拿去训练角色 LoRA。\n\n### 用法\n1. **只改一处角色描述**：`String (角色描述)` 节点（`1girl, solo, silver hair, …` 换成你的角色；男性角色改 `1boy`）。它通过 `Concatenate Text` 拼到 9 个视角提示词前面\n2. 想微调某个视角，改对应 `String (视角 N)` 节点里的视角 tags\n3. 换角色：改 `Int (Seed)` 的值（9 张会一起换）；把它的 control_after_generate 设成 `randomize`，每次 Queue 都会整组重新随机\n4. 尺寸默认 832×1216（SDXL 竖构图全身）；输出在 `output/anime/character/1_front_full_*.png` 等\n\n### 注意\n- 9 张共用 seed 不等于像素级同一张脸：要更强一致性，把 `KSampler` 步数提到 30+ / CFG 6–7，或多抽几组挑一套；需要严格同一张脸建议用 H3 的 R2V 参考生视频思路先定参考图，或挂 IPAdapter\n- SDXL 对 45° 这类精确角度控制有限：正面 / 侧面 / 背面最稳，3/4 向可能要重抽；严格角度请加 ControlNet (OpenPose)\n- 背景默认留白（`white background`），方便抠图；要带背景就把视角提示词里的 white background 去掉"
+        "## 9 向人物素材（分向单图 × 9）\n\n**先下模型**：`pixi run models-image`（默认 Illustrious XL v2.0，约 6.9GB）\n\n一次出 **9 张独立图片**：8 个方向的全身图 + 1 张正面半身特写。9 个采样器共用同一个 seed 与同一份潜空间噪声，只换视角提示词，所以人物一致性最好，出来的 PNG 可以直接当立绘 / 设定素材或拿去训练角色 LoRA。\n\n### 用法\n1. **只改一处角色描述**：`String (角色描述)` 节点（`1girl, solo, silver hair, …` 换成你的角色；男性角色改 `1boy`）。它通过 `Concatenate Text` 拼到 9 个视角提示词前面\n2. 想微调某个视角，改对应 `String (视角 N)` 节点里的视角 tags\n3. 换角色：改 `Int (Seed)` 的值（9 张会一起换）；把它的 control_after_generate 设成 `randomize`，每次 Queue 都会整组重新随机\n4. 尺寸默认 832×1216（SDXL 竖构图全身）；输出在 `output/anime/character/1_front_full_*.png` 等\n\n### 注意\n- 9 张共用 seed 不等于像素级同一张脸：要更强一致性，把 `KSampler` 步数提到 30+ / CFG 6–7，或多抽几组挑一套；需要严格同一张脸建议用 H3 的 R2V 参考生视频思路先定参考图，或挂 IPAdapter\n- SDXL 对 45° 这类精确角度控制有限：正面 / 侧面 / 背面最稳，3/4 向可能要重抽；严格角度请加 ControlNet (OpenPose)\n- 背景默认留白（`white background`），方便抠图；要带背景就把视角提示词里的 white background 去掉"
       ],
       "title": "Note: 使用说明（9 向人物素材）",
       "color": "#222",
@@ -50,7 +50,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image-bg` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
+        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
       ],
       "title": "Note: 底模与许可",
       "color": "#222",

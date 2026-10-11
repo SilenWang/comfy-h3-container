@@ -2,7 +2,7 @@
 # 容器内 artokun/comfyui-mcp 服务入口（由 supervisord 托管，随容器启动）。
 #
 # - 传输：Streamable HTTP，监听 0.0.0.0:${COMFYUI_MCP_PORT_LOCAL:-19100}
-#         （由 docker-compose 映射到宿主，见 README）。
+#         （由 docker-compose 映射到宿主，见 docs/mcp.md）。
 # - 目标 ComfyUI：同容器 127.0.0.1:${COMFYUI_PORT_LOCAL:-18188}（绕过 caddy）。
 # - 日志走 stdout/stderr -> /var/log/supervisor/comfyui-mcp.log -> ai-dock logtail
 #   -> `docker logs`，与 comfyui / caddy 的日志汇总在一起。

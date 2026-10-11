@@ -26,41 +26,14 @@ logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日�
 # 修复既有容器：PathchSageAttentionKJ 报 ModuleNotFoundError: No module named 'sageattention'
 # 时，在运行中的容器里现场编译安装 SageAttention v2.2.0（无需重建镜像）
 fix-sage-attn = { cmd = "bash scripts/install_sageattention.sh", description = "在运行中的容器里现场安装 SageAttention v2.2.0（修复 PathchSageAttentionKJ 的 ModuleNotFoundError）" }
-# 下载源：默认 modelscope（魔搭，国内快），可用 MODELS_SOURCE=hf 或对应 -hf 任务切回 HuggingFace
-models = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models.sh", description = "下载 MiniMax H3 模型（约 43GB，默认魔搭）" }
-models-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh", description = "后台下载模型（约 43GB，默认魔搭，可断点续传）" }
-models-status = { cmd = "bash scripts/models_status.sh", description = "查看后台模型下载进度" }
-models-logs = { cmd = "tail -f .build/models.log", description = "跟踪后台模型下载日志" }
-# 参考/控制模型（R2V 多视角参考 + Fun ControlNet 动作控制，约 25GB，可选）
-models-extra = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_extra.sh", description = "下载参考/控制模型（R2V + Pose 动作控制，默认魔搭）" }
-models-extra-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh extra", description = "后台下载参考/控制模型（默认魔搭，可断点续传）" }
-models-extra-status = { cmd = "bash scripts/models_status.sh extra", description = "查看后台参考/控制模型下载进度" }
-models-extra-logs = { cmd = "tail -f .build/models_extra.log", description = "跟踪后台参考/控制模型下载日志" }
-# HuggingFace 源（国内一般不需要；等价于给上面的任务加 MODELS_SOURCE=hf）
-models-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models.sh", description = "从 HuggingFace 下载 MiniMax H3 模型（约 43GB）" }
-models-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh", description = "后台从 HuggingFace 下载模型（可断点续传）" }
-models-extra-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_extra.sh", description = "从 HuggingFace 下载参考/控制模型" }
-models-extra-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh extra", description = "后台从 HuggingFace 下载参考/控制模型（可断点续传）" }
-# 二次元插画底模（galgame 素材：场景图 + 9 向人物设定素材，约 6.9GB）——
-# 对应工作流 workflows/anime_*.json，用法见 README「生成图片」。
-# 用 IMAGE_MODELS=animagine 换 Animagine XL 4.0，=all 两个都下。
-models-image = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_image.sh", description = "下载二次元插画底模（默认 Illustrious XL v2.0，约 6.9GB，默认魔搭）" }
-models-image-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh image", description = "后台下载二次元插画底模（约 6.9GB，默认魔搭，可断点续传）" }
-models-image-status = { cmd = "bash scripts/models_status.sh image", description = "查看二次元插画底模下载进度" }
-models-image-logs = { cmd = "tail -f .build/models_image.log", description = "跟踪二次元插画底模下载日志" }
-models-image-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_image.sh", description = "从 HuggingFace 下载二次元插画底模（约 6.9GB）" }
-models-image-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh image", description = "后台从 HuggingFace 下载二次元插画底模（可断点续传）" }
-# Qwen-Image-Edit 修图链路（阿里指令式改图，GGUF 量化，约 16GB）——
-# 对应工作流 workflows/qwen_image_edit_gguf_lightning.json（4 步）/ qwen_image_edit_gguf.json（20 步），
-# 用法见 README「修图：Qwen-Image-Edit」。GGUF 让 20B 模型能跑在 12GB 显存上；文本编码器
-# 默认走 Qwen2.5-VL-7B GGUF + mmproj（脚本已按 ComfyUI-GGUF 的匹配规则重命名）。
-# 换量化档：QWEN_EDIT_QUANT=Q4_K_S（画质更好、更慢）；文本编码器换 fp8：QWEN_EDIT_TEXT_ENC=fp8。
-models-qwen-edit = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_qwen_edit.sh", description = "下载 Qwen-Image-Edit 修图链路权重（GGUF，约 16GB，默认魔搭）" }
-models-qwen-edit-bg = { cmd = "MODELS_SOURCE=modelscope bash scripts/download_models_bg.sh qwen-edit", description = "后台下载 Qwen-Image-Edit 修图链路权重（约 16GB，默认魔搭，可断点续传）" }
-models-qwen-edit-status = { cmd = "bash scripts/models_status.sh qwen-edit", description = "查看 Qwen-Image-Edit 修图链路下载进度" }
-models-qwen-edit-logs = { cmd = "tail -f .build/models_qwen_edit.log", description = "跟踪 Qwen-Image-Edit 修图链路下载日志" }
-models-qwen-edit-hf = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_qwen_edit.sh", description = "从 HuggingFace 下载 Qwen-Image-Edit 修图链路权重（约 16GB）" }
-models-qwen-edit-hf-bg = { cmd = "MODELS_SOURCE=hf bash scripts/download_models_bg.sh qwen-edit", description = "后台从 HuggingFace 下载 Qwen-Image-Edit 修图链路权重（可断点续传）" }
+# ── 模型下载 ─────────────────────────────────────────────────────────────
+# 只有一个脚本 scripts/download_models.sh，类别作为参数传入；下载源固定魔搭
+# （ModelScope），不走 HuggingFace。已下载完整的文件自动跳过，中断后续传。
+# 也可直接传类别：pixi run models extra / image / qwen-edit / all。
+models = { cmd = "bash scripts/download_models.sh", description = "下载模型：pixi run models [base|extra|image|qwen-edit|all]（默认 base，约 43GB）" }
+models-extra = { cmd = "bash scripts/download_models.sh extra", description = "下载参考/控制模型（R2V + 动作控制，约 25GB）" }
+models-image = { cmd = "bash scripts/download_models.sh image", description = "下载二次元插画底模（默认 Illustrious XL v2.0，约 6.9GB）" }
+models-qwen-edit = { cmd = "bash scripts/download_models.sh qwen-edit", description = "下载 Qwen-Image-Edit 修图链路权重（GGUF，约 16GB）" }
 
 # ── Comfy MCP ───────────────────────────────────────────────────────────
 # 只有第三方 artokun MCP 这一套（supervisord 托管，Streamable HTTP，宿主 9100）：
