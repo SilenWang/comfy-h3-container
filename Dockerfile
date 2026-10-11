@@ -98,9 +98,7 @@ RUN for repo in \
 # 注：容器内只保留第三方 artokun MCP（下一节）。
 #    官方 Comfy MCP Local（Comfy-Org/comfy-mcp，stdio；客户端靠
 #    `docker exec -i comfyui-h3 comfy-mcp` 每次现起进程）已按使用反馈从镜像中
-#    移除，镜像内不再安装 comfy-cli / comfy-mcp —— 它用起来不方便，容器里留
-#    第三方这一套即可。如需官方 MCP，可在宿主侧用 pixi 环境跑（见 README
-#    「备选：在宿主机上跑官方 Comfy MCP Local」）。
+#    彻底移除：镜像内不再安装 comfy-cli / comfy-mcp，仓库也不再提供宿主侧备选。
 # ---------------------------------------------------------------
 
 # ---------------------------------------------------------------
