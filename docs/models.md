@@ -2,10 +2,10 @@
 
 ## 1. 下载入口
 
-只有**一个**下载脚本 `scripts/download_models.sh`，按类别下载对应模型；下载源固定为**魔搭 ModelScope**，不走 HuggingFace。
+只有**一个**下载脚本 `scripts/download_models.sh`，模块名作为参数下载对应模型；下载源固定为**魔搭 ModelScope**，不走 HuggingFace。
 
 ```bash
-bash scripts/download_models.sh            # 等价于 base
+bash scripts/download_models.sh            # 等价于 all（默认，不传模块即全部）
 bash scripts/download_models.sh base       # 基础视频模型（T2V / I2V / 首尾帧），约 43GB
 bash scripts/download_models.sh extra      # 参考 / 控制模型（R2V + 动作控制），约 25GB
 bash scripts/download_models.sh image      # 二次元插画底模（SDXL），约 6.9GB
@@ -13,17 +13,17 @@ bash scripts/download_models.sh qwen-edit  # Qwen-Image-Edit 修图链路（GGUF
 bash scripts/download_models.sh all        # 上面全部，约 91GB
 ```
 
-走 pixi 时同一个脚本：
+走 pixi 时是同一个脚本，且仓库里只有 `models` 这**一个** pixi 任务，模块名直接作为参数：
 
-| 命令 | 类别 | 大小 |
+| 命令 | 模块 | 大小 |
 |---|---|---|
-| `pixi run models` | base（默认） | 约 43GB |
-| `pixi run models-extra` | extra | 约 25GB |
-| `pixi run models-image` | image | 约 6.9GB |
-| `pixi run models-qwen-edit` | qwen-edit | 约 16GB |
-| `pixi run models extra` / `image` / `qwen-edit` / `all` | 同上（类别直接作为参数） | — |
+| `pixi run models` | all（不传参数的默认值） | 约 91GB |
+| `pixi run models base` | base | 约 43GB |
+| `pixi run models extra` | extra | 约 25GB |
+| `pixi run models image` | image | 约 6.9GB |
+| `pixi run models qwen-edit` | qwen-edit | 约 16GB |
 
-> 下载量大（base 约 43GB），建议在 `tmux` / `screen` 里跑，或自行放后台：
+> 下载量大（不带参数默认全部约 91GB，单下 base 也有 43GB），建议在 `tmux` / `screen` 里跑，或自行放后台：
 > `nohup bash scripts/download_models.sh > models.log 2>&1 &`。本仓库不再提供后台 / 状态查询任务。
 
 ### 断点续传与跳过
@@ -34,7 +34,7 @@ bash scripts/download_models.sh all        # 上面全部，约 91GB
 
 ### 可选环境变量
 
-| 变量 | 默认 | 适用类别 | 说明 |
+| 变量 | 默认 | 适用模块 | 说明 |
 |---|---|---|---|
 | `MODELS_DIR` | `./models` | 全部 | 模型目录（与 compose 的挂载一致），可指向外部大盘 |
 | `IMAGE_MODELS` | `illustrious` | image | `illustrious` / `animagine` / `all` |
@@ -46,13 +46,13 @@ bash scripts/download_models.sh all        # 上面全部，约 91GB
 示例：
 
 ```bash
-IMAGE_MODELS=all pixi run models-image                                  # 两个二次元底模都下
-QWEN_EDIT_QUANT=Q4_K_S pixi run models-qwen-edit                        # 修图主模型换 12.4GB 画质档
-QWEN_EDIT_TEXT_ENC=fp8 pixi run models-qwen-edit                        # 文本编码器换 fp8（免 mmproj）
-MODELS_DIR=/data/ai-models/comfy-h3 pixi run models                     # 下到外部目录
+IMAGE_MODELS=all pixi run models image                                  # 两个二次元底模都下
+QWEN_EDIT_QUANT=Q4_K_S pixi run models qwen-edit                        # 修图主模型换 12.4GB 画质档
+QWEN_EDIT_TEXT_ENC=fp8 pixi run models qwen-edit                        # 文本编码器换 fp8（免 mmproj）
+MODELS_DIR=/data/ai-models/comfy-h3 pixi run models base                # 下到外部目录
 ```
 
-## 2. 模型类别与文件清单
+## 2. 模型模块与文件清单
 
 ### base — 基础视频模型（约 43GB）
 
@@ -133,7 +133,7 @@ models/
 └── diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors                 0.12 GB（SDPose 检测器，额外）
 ```
 
-> 二次元生图底模用 `pixi run models-image` 下载，只做 T2V / I2V 不必装；Qwen 修图那几项用 `pixi run models-qwen-edit` 下载，只做视频 / 文生图不必装；最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models-extra` 下载。
+> 二次元生图底模用 `pixi run models image` 下载，只做 T2V / I2V 不必装；Qwen 修图那几项用 `pixi run models qwen-edit` 下载，只做视频 / 文生图不必装；最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models extra` 下载。
 
 ## 4. 模型许可
 

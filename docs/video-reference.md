@@ -3,7 +3,7 @@
 除 T2V / I2V 外，H3 原生支持三种更强的「参考」玩法。仓库已附对应官方工作流，使用前先下额外模型（约 25GB）：
 
 ```bash
-pixi run models-extra      # 参考 / 控制模型：ref2va 主模型 + 控制补丁 + R2V Turbo LoRA + SDPose
+pixi run models extra      # 参考 / 控制模型：ref2va 主模型 + 控制补丁 + R2V Turbo LoRA + SDPose
 ```
 
 这几个模板需要 **ComfyUI ≥ 0.35.0**——本镜像构建时会拉最新 master，满足要求。

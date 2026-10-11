@@ -25,7 +25,7 @@ pixi run up
 ## 2. 下载权重（约 16GB）
 
 ```bash
-pixi run models-qwen-edit        # 魔搭下载，支持断点续传
+pixi run models qwen-edit        # 魔搭下载，支持断点续传
 ```
 
 下什么、放哪（完整清单见 [models.md](models.md#qwen-edit--qwen-image-edit-修图链路约-16gb)）：
@@ -40,7 +40,7 @@ pixi run models-qwen-edit        # 魔搭下载，支持断点续传
 
 > **mmproj 是这条链路最容易踩的坑**：ComfyUI-GGUF 加载 `qwen2vl` 文本编码器时，会在同目录按「文件名包含编码器基名」的规则找 `mmproj*.gguf`。上游 unsloth 的文件名就叫 `mmproj-F16.gguf`（不含模型名），匹配不上就会在日志里刷 `Can't find mmproj file ... Qwen-Image-Edit will be broken!`、参考图被当成没有。下载脚本已经把它落盘成 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`，不用手动改。
 
-量化档按显存 / 内存挑（`QWEN_EDIT_QUANT=... pixi run models-qwen-edit`）：
+量化档按显存 / 内存挑（`QWEN_EDIT_QUANT=... pixi run models qwen-edit`）：
 
 | 档位 | 主模型 | 说明 |
 |---|---|---|
@@ -83,7 +83,7 @@ pixi run models-qwen-edit        # 魔搭下载，支持断点续传
 不想用 GGUF 文本编码器（或想对比效果）：
 
 ```bash
-QWEN_EDIT_TEXT_ENC=fp8 pixi run models-qwen-edit   # 额外下 9.4GB qwen_2.5_vl_7b_fp8_scaled.safetensors
+QWEN_EDIT_TEXT_ENC=fp8 pixi run models qwen-edit   # 额外下 9.4GB qwen_2.5_vl_7b_fp8_scaled.safetensors
 # 或两种都下：QWEN_EDIT_TEXT_ENC=both
 ```
 

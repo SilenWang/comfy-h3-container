@@ -48,18 +48,18 @@ docker exec comfyui-h3 /opt/environments/python/comfyui/bin/python -c "import gg
 Can't find mmproj file for 'Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf' (matching:'qwen2.5-vl-7b-instruct')! Qwen-Image-Edit will be broken!
 ```
 
-**修复**：确认 `models/text_encoders/` 下有 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`（文件名必须含 `Qwen2.5-VL-7B-Instruct`）。缺了就跑 `pixi run models-qwen-edit` 补下；自己从上游下载的话记得把 `mmproj-F16.gguf` 重命名成这个名字。
+**修复**：确认 `models/text_encoders/` 下有 `Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf`（文件名必须含 `Qwen2.5-VL-7B-Instruct`）。缺了就跑 `pixi run models qwen-edit` 补下；自己从上游下载的话记得把 `mmproj-F16.gguf` 重命名成这个名字。
 
 **现象 C**：Queue 后长时间卡在加载，或报 OOM / 容器被杀。
 
-**修复**：降量化档（`QWEN_EDIT_QUANT=Q3_K_S pixi run models-qwen-edit`，默认就是它）、调高 `docker-compose.yml` 里的 `memory` 上限、确认 `COMFYUI_ARGS` 带 `--lowvram`（默认带）。首次加载 9.2GB 主模型 + 4.7GB 文本编码器本身就慢，先等一次完整加载。
+**修复**：降量化档（`QWEN_EDIT_QUANT=Q3_K_S pixi run models qwen-edit`，默认就是它）、调高 `docker-compose.yml` 里的 `memory` 上限、确认 `COMFYUI_ARGS` 带 `--lowvram`（默认带）。首次加载 9.2GB 主模型 + 4.7GB 文本编码器本身就慢，先等一次完整加载。
 
 ## 模型下载中断 / 想确认下载进度
 
 下载脚本没有后台任务，直接在跑它的终端看输出即可；中断后重跑同一条命令会从断点续传，已下载完整的文件会打印 `SKIP (complete)`：
 
 ```bash
-pixi run models-extra            # 或 base / image / qwen-edit / all
+pixi run models extra            # 或 base / image / qwen-edit（不带参数即 all）
 ```
 
 想确认某个文件是否完整，比对本地大小与远端大小（魔搭的 HEAD 不返回长度，用 Range 请求拿总大小；脚本里的 `remote_size()` 就是这么做的）：
