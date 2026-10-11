@@ -161,6 +161,11 @@ ENV COMFYUI_PORT_HOST=8188
 ENV WEB_PASSWORD=comfy-h3
 ENV COMFY_LOCAL_URL=http://127.0.0.1:18188
 ENV COMFYUI_MCP_PORT_LOCAL=19100
+# 注意：下面只是「镜像默认值 / 兜底值」，不是把 token 写死在这里。
+#   - 经 docker compose 启动时，docker-compose.yml 的 environment 会用宿主 .env
+#     （或 shell 环境）里的 COMFYUI_MCP_HTTP_TOKEN 覆盖下面这个值；
+#   - 只有直接 `docker run comfy-h3-container:latest` 且没带 `-e` 时才会用到它。
+#   改完 .env 要 `docker compose up -d`（重建容器）才生效，`docker restart` 不重读。
 ENV COMFYUI_MCP_HTTP_TOKEN=comfy-h3-mcp
 
 EXPOSE 8188

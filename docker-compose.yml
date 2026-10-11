@@ -49,6 +49,9 @@ services:
       # --lowvram：按需加载/卸载，12GB 显卡实测关键参数
       COMFYUI_ARGS: "--listen 0.0.0.0 --lowvram"
       # artokun MCP（容器内）的入站鉴权令牌；远程客户端需带 Authorization: Bearer <token>
+      # 取值来源：宿主 .env（docker compose 会自动读本目录 .env）或 shell 环境里的
+      # 同名变量；只有它完全没设时才回落到下面的默认值 comfy-h3-mcp（形同公开）。
+      # 改完 .env 需 `docker compose up -d` 重建容器才生效（restart 不会重读 .env）。
       COMFYUI_MCP_HTTP_TOKEN: ${COMFYUI_MCP_HTTP_TOKEN:-comfy-h3-mcp}
       # 容器内 MCP 监听端口，与上面的宿主端口映射联动（改一处即可，两端始终对齐）
       COMFYUI_MCP_PORT_LOCAL: ${COMFYUI_MCP_PORT_LOCAL:-19100}
