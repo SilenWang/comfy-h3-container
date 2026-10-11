@@ -6,7 +6,7 @@
 2. 点 Queue 执行，等待输出（右侧 Video 面板可预览 / 下载）
 3. 输出文件同时保存在宿主的 `./output/` 目录
 
-后三种「参考」玩法需要额外模型（约 25GB，`pixi run models-extra`），见 [video-reference.md](video-reference.md)。
+后三种「参考」玩法需要额外模型（约 25GB，`pixi run models extra`），见 [video-reference.md](video-reference.md)。
 
 ## 2. 加速配置（自带 workflow 已调好）
 

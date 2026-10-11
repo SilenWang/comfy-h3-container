@@ -27,7 +27,7 @@ mkdir -p models output
 详见 [models.md](models.md)。最简形式：
 
 ```bash
-pixi run models            # 基础视频模型（T2V / I2V），约 43GB
+pixi run models base       # 基础视频模型（T2V / I2V），约 43GB；不带参数 = all，约 91GB
 ```
 
 ## 3. 构建并启动
@@ -91,7 +91,7 @@ OUTPUT_DIR=/data/ai-output/comfy-h3      # 可选，同理
 `docker-compose.yml` 用的是 `${MODELS_DIR:-./models}`，所以不设就是原来的 `./models`，设了就挂外部目录到容器内的 `/workspace/models`。下载脚本也认同一个变量，直接把模型下到外部盘：
 
 ```bash
-MODELS_DIR=/data/ai-models/comfy-h3 pixi run models
+MODELS_DIR=/data/ai-models/comfy-h3 pixi run models base
 ```
 
 两个注意点（就是之前踩过的坑）：

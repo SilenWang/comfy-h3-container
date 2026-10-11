@@ -13,14 +13,14 @@
 ## 1. 先下底模（约 6.9GB）
 
 ```bash
-pixi run models-image           # 默认 Illustrious XL v2.0，魔搭下载，支持断点续传
+pixi run models image           # 默认 Illustrious XL v2.0，魔搭下载，支持断点续传
 ```
 
 底模落在 `models/checkpoints/`（`MODELS_DIR` 同样生效，可直接下到外部大盘）。换 / 加底模：
 
 ```bash
-IMAGE_MODELS=animagine pixi run models-image    # Animagine XL 4.0：插画质感与光影更好
-IMAGE_MODELS=all pixi run models-image          # 两个都下（约 13.9GB）
+IMAGE_MODELS=animagine pixi run models image    # Animagine XL 4.0：插画质感与光影更好
+IMAGE_MODELS=all pixi run models image          # 两个都下（约 13.9GB）
 ```
 
 工作流默认加载 `illustrious-xl-v2.0.safetensors`；想用另一个底模，把 `Load Checkpoint` 节点的 `ckpt_name` 改成 `animagine-xl-4.0.safetensors` 即可（每个工作流各有一处）。

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# 模型下载（本仓库唯一的模型下载入口）：按类别下载对应模型。
+# 模型下载（本仓库唯一的模型下载入口）：按模块下载对应模型。
 # 下载源固定为魔搭 ModelScope（国内速度快、连接稳定），不使用 HuggingFace。
 #
-#   bash scripts/download_models.sh            # 等价于 base
+#   bash scripts/download_models.sh            # 等价于 all（默认）
 #   bash scripts/download_models.sh base       # 基础视频模型（T2V / I2V / 首尾帧），约 43GB
 #   bash scripts/download_models.sh extra      # 参考 / 控制模型（R2V + 动作控制），约 25GB
 #   bash scripts/download_models.sh image      # 二次元插画底模（SDXL），约 6.9GB
 #   bash scripts/download_models.sh qwen-edit  # Qwen-Image-Edit 修图链路（GGUF），约 16GB
 #   bash scripts/download_models.sh all        # 上面全部，约 91GB
 #
-# 也可走 pixi：pixi run models [base|extra|image|qwen-edit|all]（等价于 pixi run models-extra 等）。
+# 也可走 pixi：pixi run models [base|extra|image|qwen-edit|all]（不带参数即 all），
+# 仓库内只有 models 这一个 pixi 任务，模块名作为参数传入。
 #
 # 行为：
 #   - 已下载完整（本地大小 == 远端大小）的文件直接 SKIP，不重复占流量；
@@ -19,7 +20,7 @@
 #
 # 可选环境变量：
 #   MODELS_DIR           模型目录，默认仓库内 ./models（与 docker-compose 的挂载一致）
-#   IMAGE_MODELS         image 类别：illustrious（默认）| animagine | all
+#   IMAGE_MODELS         image 模块：illustrious（默认）| animagine | all
 #   QWEN_EDIT_QUANT      qwen-edit 主模型量化档，默认 Q3_K_S
 #   QWEN_EDIT_TEXT_QUANT qwen-edit 文本编码器量化档，默认 Q4_K_M
 #   QWEN_EDIT_TEXT_ENC   qwen-edit 文本编码器形式：gguf（默认）| fp8 | both
@@ -28,18 +29,18 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-用法：bash scripts/download_models.sh [类别]
+用法：bash scripts/download_models.sh [模块]
 
-类别：
-  base        基础视频模型（T2V / I2V / 首尾帧），约 43GB（默认）
+模块：
+  base        基础视频模型（T2V / I2V / 首尾帧），约 43GB
   extra       参考 / 控制模型（R2V + 动作控制 + SDPose），约 25GB
   image       二次元插画底模（SDXL），约 6.9GB
   qwen-edit   Qwen-Image-Edit 修图链路（GGUF），约 16GB
-  all         以上全部，约 91GB
+  all         以上全部，约 91GB（默认，不传模块即它）
 
 可选环境变量：
   MODELS_DIR            模型目录，默认仓库内 ./models
-  IMAGE_MODELS          image 类别：illustrious（默认）| animagine | all
+  IMAGE_MODELS          image 模块：illustrious（默认）| animagine | all
   QWEN_EDIT_QUANT       qwen-edit 主模型量化档，默认 Q3_K_S
   QWEN_EDIT_TEXT_QUANT  qwen-edit 文本编码器量化档，默认 Q4_K_M
   QWEN_EDIT_TEXT_ENC    qwen-edit 文本编码器形式：gguf（默认）| fp8 | both
@@ -235,7 +236,7 @@ download_qwen_edit() {
   fi
 }
 
-GROUP="${1:-base}"
+GROUP="${1:-all}"
 case "$GROUP" in
   base)           download_base ;;
   extra)          download_extra ;;
@@ -249,7 +250,7 @@ case "$GROUP" in
     ;;
   -h|--help|help) usage; exit 0 ;;
   *)
-    echo "未知的模型类别：$GROUP（可选：base | extra | image | qwen-edit | all）" >&2
+    echo "未知的模型模块：$GROUP（可选：base | extra | image | qwen-edit | all）" >&2
     echo >&2
     usage >&2
     exit 2

@@ -19,12 +19,12 @@
 ## 常用命令速查
 
 ```bash
-# 模型下载（唯一入口，类别作为参数；下载源固定魔搭 ModelScope）
-pixi run models             # = base：基础视频模型，约 43GB
+# 模型下载（唯一入口：一个脚本 + 一个 pixi 任务，模块名作为参数；下载源固定魔搭 ModelScope）
+pixi run models             # 不带参数 = all：上面四个模块全部，约 91GB（默认）
+pixi run models base        # 基础视频模型，约 43GB
 pixi run models extra       # 参考 / 控制模型（R2V + 动作控制），约 25GB
 pixi run models image       # 二次元插画底模，约 6.9GB
 pixi run models qwen-edit   # Qwen-Image-Edit 修图链路，约 16GB
-pixi run models all         # 以上全部，约 91GB
 
 # 镜像与容器
 pixi run build && pixi run build-status   # 后台构建 + 续建（推荐）
@@ -36,4 +36,4 @@ pixi run fix-sage-attn      # 现场补装 SageAttention（无需重建镜像）
 pixi run mcp-config         # 打印 MCP 客户端配置片段
 ```
 
-`pixi run models-extra` / `models-image` / `models-qwen-edit` 等价于上面的 `pixi run models <类别>`。
+`models` 是唯一的模型下载任务，模块名作为参数；`all`（不传参数的默认值）等价于依次跑 base / extra / image / qwen-edit。

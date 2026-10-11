@@ -24,7 +24,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 9 向人物设定表（单图 3×3）\n\n**先下模型**：`pixi run models-image`（默认 Illustrious XL v2.0，约 6.9GB）\n\n一张图里同时给出 9 格视角（正面全身 / 正面半身 / 侧面 / 背面 / 各 3/4 向），适合角色定稿、给美术当参考图、给下游 3D / 立绘外包对形状。\n\n### 用法\n1. 把 `Prompt (Character Sheet)` 里的 `1girl, solo, silver hair, long hair, blue eyes, school uniform …` 换成你的角色 tags（男性角色改 `1boy`）\n2. 尺寸默认 1024×1024（`LatentUpscale` 放大到 1536×1536）；格数不够 / 太挤时先关二段放大看构图\n3. Queue，输出在 `output/anime/character_sheet/`\n\n### 注意\n- 单图 9 格的**人物一致性最好**（同一张图内不会有种子差异），但每格分辨率有限，放大后脸部细节不如单张出图\n- 需要**分开的单向素材**（立绘 / 训练用）：用 `anime_character_9views` 工作流，同一 seed 出 9 张独立图\n- SDXL 对精确 45° 角度的控制有限：正面 / 侧面 / 背面最稳，3/4 向可能要重抽几次；要严格角度就上 ControlNet (OpenPose)"
+        "## 9 向人物设定表（单图 3×3）\n\n**先下模型**：`pixi run models image`（默认 Illustrious XL v2.0，约 6.9GB）\n\n一张图里同时给出 9 格视角（正面全身 / 正面半身 / 侧面 / 背面 / 各 3/4 向），适合角色定稿、给美术当参考图、给下游 3D / 立绘外包对形状。\n\n### 用法\n1. 把 `Prompt (Character Sheet)` 里的 `1girl, solo, silver hair, long hair, blue eyes, school uniform …` 换成你的角色 tags（男性角色改 `1boy`）\n2. 尺寸默认 1024×1024（`LatentUpscale` 放大到 1536×1536）；格数不够 / 太挤时先关二段放大看构图\n3. Queue，输出在 `output/anime/character_sheet/`\n\n### 注意\n- 单图 9 格的**人物一致性最好**（同一张图内不会有种子差异），但每格分辨率有限，放大后脸部细节不如单张出图\n- 需要**分开的单向素材**（立绘 / 训练用）：用 `anime_character_9views` 工作流，同一 seed 出 9 张独立图\n- SDXL 对精确 45° 角度的控制有限：正面 / 侧面 / 背面最稳，3/4 向可能要重抽几次；要严格角度就上 ControlNet (OpenPose)"
       ],
       "title": "Note: 使用说明（设定表）",
       "color": "#222",
@@ -50,7 +50,7 @@
         "Node name for S&R": "MarkdownNote"
       },
       "widgets_values": [
-        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models-image` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
+        "## 底模与许可\n\n- **默认底模**：Illustrious XL v2.0（SDXL 动漫底模，Danbooru tag 遵循度好）\n- **备用底模**：Animagine XL 4.0（插画质感 / 光影更强）\n\n两个模型都随 `pixi run models image` 下载（默认只下 Illustrious，约 6.9GB；`IMAGE_MODELS=animagine` 或 `IMAGE_MODELS=all` 可换 / 全下）。换模型只需把 `Load Checkpoint` 的 `ckpt_name` 改成对应文件名。\n\n- 许可：Illustrious XL v2.0 为 CreativeML OpenRAIL-M，Animagine XL 4.0 为 OpenRAIL++-M，**均允许商用**（含 galgame 素材），但须随附许可副本并遵守其使用限制条款\n- 权重来源：[Illustrious-XL-v2.0](https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0)、[animagine-xl-4.0](https://huggingface.co/cagliostrolab/animagine-xl-4.0)（魔搭同名仓库亦可）"
       ],
       "title": "Note: 底模与许可",
       "color": "#222",

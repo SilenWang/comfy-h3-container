@@ -3,7 +3,7 @@
 #
 # 用法：
 #   cp .env.example .env           # 认证等配置（默认已关闭密码）
-#   pixi run models                # 下载模型（魔搭源，约 43GB；= ./scripts/download_models.sh）
+#   pixi run models base           # 下载模型（魔搭源，约 43GB；不带参数则下全部约 91GB；= ./scripts/download_models.sh base）
 #   docker compose up -d --build   # 或：pixi run build 后台续建 + pixi run up
 #   # WebUI: http://localhost:8188  （默认免密；开启认证则账号 user / 密码见 .env）
 #
