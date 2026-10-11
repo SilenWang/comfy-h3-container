@@ -95,26 +95,16 @@ RUN for repo in \
                       /opt/ComfyUI/custom_nodes/ComfyUI-MAINodes
 
 # ---------------------------------------------------------------
-# 4. 安装 Comfy MCP Local：官方 stdio MCP server（引擎是 comfy-cli）
-#    参考：https://github.com/Comfy-Org/comfy-mcp
-#    装在容器内，MCP 客户端用 `docker exec -i comfyui-h3 comfy-mcp` 调起，
-#    直接驱动容器内 ComfyUI，不经过 caddy 反代，因此与 WebUI 认证无关。
-#    COMFY_LOCAL_URL 见下方 ENV。
-#    注意：必须一并升级 typer。comfy-cli 只要求 typer>=0.12.5，而基础镜像里
-#          的旧 typer 与新版 click 不兼容，`comfy` 启动时会抛
-#          "Secondary flag is not valid for non-boolean flag"。升 typer 即可。
+# 注：容器内只保留第三方 artokun MCP（下一节）。
+#    官方 Comfy MCP Local（Comfy-Org/comfy-mcp，stdio；客户端靠
+#    `docker exec -i comfyui-h3 comfy-mcp` 每次现起进程）已按使用反馈从镜像中
+#    移除，镜像内不再安装 comfy-cli / comfy-mcp —— 它用起来不方便，容器里留
+#    第三方这一套即可。如需官方 MCP，可在宿主侧用 pixi 环境跑（见 README
+#    「备选：在宿主机上跑官方 Comfy MCP Local」）。
 # ---------------------------------------------------------------
-RUN bash -c "source /opt/environments/python/comfyui/bin/activate && \
-        pip install --no-cache-dir --upgrade pip typer && \
-        pip install --no-cache-dir 'comfy-cli>=1.14.0' 'comfy-mcp'" && \
-    ln -sf /opt/environments/python/comfyui/bin/comfy /usr/local/bin/comfy && \
-    ln -sf /opt/environments/python/comfyui/bin/comfy-mcp /usr/local/bin/comfy-mcp && \
-    bash -c "source /opt/environments/python/comfyui/bin/activate && \
-        comfy set-default /opt/ComfyUI && \
-        comfy --version && comfy-mcp --version"
 
 # ---------------------------------------------------------------
-# 5. 安装 artokun/comfyui-mcp：第三方 ComfyUI MCP（让 Agent 直接搭建/编辑工作流
+# 4. 安装 artokun/comfyui-mcp：第三方 ComfyUI MCP（让 Agent 直接搭建/编辑工作流
 #    并提供原生远程 HTTP），以 Node 运行，并作为容器内 supervisor 托管服务随容器启动。
 #    参考：https://github.com/artokun/comfyui-mcp（npm 包 comfyui-mcp）
 #    - 要求 Node >= 22：装官方 Node 22 的 linux tarball（.tar.gz，免 xz 依赖），
@@ -151,17 +141,17 @@ COPY docker/supervisor-comfyui-mcp.sh /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 
 # ---------------------------------------------------------------
-# 6. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
+# 5. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
 # ---------------------------------------------------------------
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
 
 # ---------------------------------------------------------------
-# 7. 默认环境变量（可用 docker-compose / .env 覆盖）
+# 6. 默认环境变量（可用 docker-compose / .env 覆盖）
 #    - COMFYUI_ARGS: --lowvram 按需加载/卸载（12GB 显卡实测关键参数）
 #    - COMFYUI_PORT_LOCAL: 容器内 ComfyUI 监听端口（必须 != COMFYUI_PORT_HOST，
 #      否则与 ai-dock 的 caddy 反向代理冲突）
 #    - WEB_PASSWORD / WEB_ENABLE_AUTH: ai-dock 的 caddy 认证（详见 README）
-#    - COMFY_LOCAL_URL: comfy-cli / artokun MCP 连容器内 ComfyUI 的地址。
+#    - COMFY_LOCAL_URL: 容器内 artokun MCP 连 ComfyUI 的地址。
 #      ComfyUI 进程监听 COMFYUI_PORT_LOCAL(18188)，而 caddy 在 8188；容器内
 #      MCP 直连 18188 可以完全绕过反代与认证。
 #    - COMFYUI_MCP_PORT_LOCAL: 容器内 artokun MCP（Streamable HTTP）监听端口。

@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # 打印 Comfy MCP 的 AI 客户端配置片段（Claude Code / Claude Desktop / Cursor）。
 #
-#   ./scripts/mcp_client_config.sh               # 官方 comfy-mcp · 容器模式（stdio，推荐）
-#   ./scripts/mcp_client_config.sh host          # 官方 comfy-mcp · 宿主模式（stdio）
-#   ./scripts/mcp_client_config.sh artokun       # artokun comfyui-mcp · 容器内托管服务（Streamable HTTP）
+#   ./scripts/mcp_client_config.sh               # artokun comfyui-mcp · 容器内托管服务（默认，推荐）
+#   ./scripts/mcp_client_config.sh artokun       # 同上，显式指定
+#   ./scripts/mcp_client_config.sh host          # 官方 comfy-mcp · 宿主模式（可选，需要 pixi 环境）
 #
-# 官方 comfy-mcp（comfy-cli 引擎，偏执行 / 模板 / 自省）：
-#   容器模式：跑在 comfyui-h3 容器内，经 `docker exec -i` 调起，直连容器内
-#             ComfyUI（127.0.0.1:18188），绕过 caddy 反代，与 WEB_ENABLE_AUTH 无关。
-#   宿主模式：用当前 pixi 环境里的 comfy-mcp 连 `COMFYUI_URL`（需先关认证或填 401）。
-#
-# artokun/comfyui-mcp（第三方，能让 Agent 直接搭建 / 编辑工作流）：
+# 容器内只跑第三方 artokun/comfyui-mcp（能让 Agent 直接搭建 / 编辑工作流）：
 #   随容器由 supervisord 托管，容器内以 Streamable HTTP 暴露（宿主端口见 compose，
 #   默认 0.0.0.0:9100，同机其他容器 / 局域网可达），日志随容器日志。
 #   远程客户端连 URL + Bearer token；同机其他容器别用 127.0.0.1（那是容器自己的
 #   loopback），要用宿主 IP，或加 --add-host host.docker.internal:host-gateway。
+#
+# 官方 Comfy MCP Local（Comfy-Org/comfy-mcp，stdio）已从镜像中移除：它每次调用都要
+# 客户端 `docker exec -i <容器> comfy-mcp` 现起进程，配置繁琐。如需官方那套，
+# 可在宿主侧用 pixi 环境跑（host 模式），注意 COMFYUI_URL 走的是 8188 上的 caddy
+# 反代层，`WEB_ENABLE_AUTH=true` 时会直接 401。
 set -euo pipefail
 
-MODE="${1:-docker}"
-CONTAINER="${COMFY_CONTAINER_NAME:-comfyui-h3}"
+MODE="${1:-artokun}"
 HOST_URL="${COMFYUI_URL:-http://127.0.0.1:8188}"
 MCP_PORT="${MCP_HTTP_PORT:-${COMFYUI_MCP_PORT_HOST:-9100}}"
 TOKEN="${COMFYUI_MCP_HTTP_TOKEN:-comfy-h3-mcp}"
@@ -35,57 +34,6 @@ public_host() {
 }
 
 case "$MODE" in
-  docker)
-    echo "# ── 官方 comfy-mcp · 容器模式（stdio，推荐）───────────────────────"
-    echo "# 前置：容器已启动（pixi run up），且宿主机有 docker CLI。"
-    echo
-    echo "## Claude Code —— 一条命令注册："
-    echo "claude mcp add comfy-mcp -- docker exec -i ${CONTAINER} comfy-mcp"
-    echo
-    echo "## Claude Desktop / Cursor —— 写入 claude_desktop_config.json 或 ~/.cursor/mcp.json："
-    echo '{'
-    echo '  "mcpServers": {'
-    echo '    "comfy-mcp": {'
-    echo '      "command": "docker",'
-    echo "      \"args\": [\"exec\", \"-i\", \"${CONTAINER}\", \"comfy-mcp\"]"
-    echo '    }'
-    echo '  }'
-    echo '}'
-    ;;
-
-  host)
-    COMFY_BIN="$(command -v comfy || true)"
-    COMFY_MCP="$(command -v comfy-mcp || true)"
-    if [[ -z "$COMFY_BIN" || -z "$COMFY_MCP" ]]; then
-      echo "未在当前环境找到 comfy / comfy-mcp。" >&2
-      echo "请先在本目录执行：pixi install && pixi run mcp-config host" >&2
-      exit 1
-    fi
-    echo "# ── 官方 comfy-mcp · 宿主模式 ──────────────────────────────────────"
-    echo "# 前置：comfy-cli 已有可用 workspace（comfy set-default <ComfyUI 目录>）。"
-    echo "# 注意：宿主机上没有本机 ComfyUI，这里用 COMFYUI_URL 指向容器暴露的端口。"
-    echo "#       若 .env 里 WEB_ENABLE_AUTH=true，请求会返回 401，请先关闭认证。"
-    echo
-    echo "## Claude Code —— 一条命令注册："
-    echo "claude mcp add comfy-mcp \\"
-    echo "  -e COMFY_BIN=${COMFY_BIN} \\"
-    echo "  -e COMFYUI_URL=${HOST_URL} \\"
-    echo "  -- ${COMFY_MCP}"
-    echo
-    echo "## Claude Desktop / Cursor —— 写入 claude_desktop_config.json 或 ~/.cursor/mcp.json："
-    echo '{'
-    echo '  "mcpServers": {'
-    echo '    "comfy-mcp": {'
-    echo "      \"command\": \"${COMFY_MCP}\","
-    echo '      "env": {'
-    echo "        \"COMFY_BIN\": \"${COMFY_BIN}\","
-    echo "        \"COMFYUI_URL\": \"${HOST_URL}\""
-    echo '      }'
-    echo '    }'
-    echo '  }'
-    echo '}'
-    ;;
-
   artokun)
     ENDPOINT="http://$(public_host):${MCP_PORT}/mcp"
     echo "# ── artokun comfyui-mcp · 容器内托管服务（Streamable HTTP）─────────"
@@ -116,8 +64,41 @@ case "$MODE" in
     echo '}'
     ;;
 
+  host)
+    COMFY_BIN="$(command -v comfy || true)"
+    COMFY_MCP="$(command -v comfy-mcp || true)"
+    if [[ -z "$COMFY_BIN" || -z "$COMFY_MCP" ]]; then
+      echo "未在当前环境找到 comfy / comfy-mcp。" >&2
+      echo "请先在本目录执行：pixi install && pixi run mcp-config host" >&2
+      exit 1
+    fi
+    echo "# ── 官方 comfy-mcp · 宿主模式（镜像内已不安装，可选）───────────────"
+    echo "# 前置：comfy-cli 已有可用 workspace（comfy set-default <ComfyUI 目录>）。"
+    echo "# 注意：宿主机上没有本机 ComfyUI，这里用 COMFYUI_URL 指向容器暴露的端口。"
+    echo "#       若 .env 里 WEB_ENABLE_AUTH=true，请求会返回 401，请先关闭认证。"
+    echo
+    echo "## Claude Code —— 一条命令注册："
+    echo "claude mcp add comfy-mcp \\"
+    echo "  -e COMFY_BIN=${COMFY_BIN} \\"
+    echo "  -e COMFYUI_URL=${HOST_URL} \\"
+    echo "  -- ${COMFY_MCP}"
+    echo
+    echo "## Claude Desktop / Cursor —— 写入 claude_desktop_config.json 或 ~/.cursor/mcp.json："
+    echo '{'
+    echo '  "mcpServers": {'
+    echo '    "comfy-mcp": {'
+    echo "      \"command\": \"${COMFY_MCP}\","
+    echo '      "env": {'
+    echo "        \"COMFY_BIN\": \"${COMFY_BIN}\","
+    echo "        \"COMFYUI_URL\": \"${HOST_URL}\""
+    echo '      }'
+    echo '    }'
+    echo '  }'
+    echo '}'
+    ;;
+
   *)
-    echo "用法：$0 [docker|host|artokun]" >&2
+    echo "用法：$0 [artokun|host]（默认 artokun）" >&2
     exit 2
     ;;
 esac
