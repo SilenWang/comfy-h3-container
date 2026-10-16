@@ -9,8 +9,9 @@ bash scripts/download_models.sh            # 等价于 all（默认，不传模�
 bash scripts/download_models.sh base       # 基础视频模型（T2V / I2V / 首尾帧），约 43GB
 bash scripts/download_models.sh extra      # 参考 / 控制模型（R2V + 动作控制），约 25GB
 bash scripts/download_models.sh image      # 二次元插画底模（SDXL），约 6.9GB
-bash scripts/download_models.sh qwen-edit  # Qwen-Image-Edit 修图链路（GGUF），约 16GB
-bash scripts/download_models.sh all        # 上面全部，约 91GB
+bash scripts/download_models.sh qwen-edit   # Qwen-Image-Edit 修图链路（GGUF），约 16GB
+bash scripts/download_models.sh consistency # 角色一致性：多机位 LoRA，约 0.3GB
+bash scripts/download_models.sh all         # 上面全部，约 91GB
 ```
 
 走 pixi 时是同一个脚本，且仓库里只有 `models` 这**一个** pixi 任务，模块名直接作为参数：
@@ -22,6 +23,7 @@ bash scripts/download_models.sh all        # 上面全部，约 91GB
 | `pixi run models extra` | extra | 约 25GB |
 | `pixi run models image` | image | 约 6.9GB |
 | `pixi run models qwen-edit` | qwen-edit | 约 16GB |
+| `pixi run models consistency` | consistency | 约 0.3GB |
 
 > 下载量大（不带参数默认全部约 91GB，单下 base 也有 43GB），建议在 `tmux` / `screen` 里跑，或自行放后台：
 > `nohup bash scripts/download_models.sh > models.log 2>&1 &`。本仓库不再提供后台 / 状态查询任务。
@@ -107,6 +109,16 @@ GGUF 量化链路，来自魔搭 `unsloth/Qwen-Image-Edit-2511-GGUF`、`unsloth/
 
 用量化档 / 换编码器的取舍与用法见 [image-edit.md](image-edit.md)。
 
+### consistency — 角色一致性：多机位 LoRA（约 0.3GB）
+
+给 Qwen-Image-Edit 用的**多角度相机控制 LoRA**，来自魔搭 `fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA`。用途是「同一张角色基准图 → 按明确写出的机位出图」，比共用 seed 抽卡稳得多（角色设定表 / 表情差分素材都用它）。
+
+| 文件 | 大小 | 目录 | 用途 |
+|---|---|---|---|
+| `qwen-image-edit-2511-multiple-angles-lora.safetensors` | 0.295GB | `loras/` | 96 个机位（4 仰俯 × 8 方位 × 3 距离），提示词形如 `<sks> front view eye-level shot medium shot` |
+
+工作流见 [image-edit.md](image-edit.md)（`qwen_image_edit_multiangle.json` 多机位出图 / `qwen_image_edit_reference.json` 双参考图编辑）。
+
 ## 3. 模型目录结构
 
 `models/` 挂载进容器 `/workspace/models`，子目录由 `extra_model_paths.yaml` 映射成 ComfyUI 的各模型搜索路径：
@@ -126,6 +138,7 @@ models/
 ├── text_encoders/Qwen2.5-VL-7B-Instruct-mmproj-F16.gguf                 1.35 GB（视觉塔，缺了 Qwen 修图会坏）
 ├── vae/qwen_image_vae.safetensors                                       0.25 GB（Qwen 修图 VAE）
 ├── loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors    0.81 GB（Qwen 修图 4 步加速，可选）
+├── loras/qwen-image-edit-2511-multiple-angles-lora.safetensors          0.295 GB（多机位 LoRA，可选）
 ├── diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors  19.53 GB（R2V，额外）
 ├── loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors     1.82 GB（R2V Turbo，额外）
 ├── model_patches/minimax_h3_fun_controlnet_union_pruned_int8_convrot…  2.14 GB（动作控制，额外）
@@ -133,7 +146,7 @@ models/
 └── diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors                 0.12 GB（SDPose 检测器，额外）
 ```
 
-> 二次元生图底模用 `pixi run models image` 下载，只做 T2V / I2V 不必装；Qwen 修图那几项用 `pixi run models qwen-edit` 下载，只做视频 / 文生图不必装；最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models extra` 下载。
+> 二次元生图底模用 `pixi run models image` 下载，只做 T2V / I2V 不必装；Qwen 修图那几项用 `pixi run models qwen-edit` 下载，多机位 LoRA 用 `pixi run models consistency`（0.3GB，可选），只做视频 / 文生图不必装；最后 5 项（约 25GB）仅 R2V / 动作控制 / 多帧参考需要，用 `pixi run models extra` 下载。
 
 ## 4. 模型许可
 
@@ -143,5 +156,6 @@ models/
 | Illustrious XL v2.0 | CreativeML OpenRAIL-M，允许商用 |
 | Animagine XL 4.0 | CreativeML OpenRAIL++-M，允许商用 |
 | Qwen-Image-Edit-2511 链路（主模型 / GGUF 量化 / Lightning LoRA / Qwen2.5-VL 文本编码器） | Apache-2.0，允许商用（含游戏素材） |
+| Qwen-Image-Edit-2511 Multiple Angles LoRA（fal） | Apache-2.0，允许商用 |
 
 具体要求（随附许可副本、保留出处、使用限制条款）见 [README 的许可章节](../README.md#license)。

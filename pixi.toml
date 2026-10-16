@@ -31,7 +31,7 @@ fix-sage-attn = { cmd = "bash scripts/install_sageattention.sh", description = "
 # 本体也只有一个 scripts/download_models.sh；下载源固定魔搭（ModelScope），
 # 不走 HuggingFace。不传参数默认下载全部模块（all，约 91GB）。
 # 已下载完整的文件自动跳过，中断后续传。
-models = { cmd = "bash scripts/download_models.sh {{ module }}", args = [{ arg = "module", default = "all" }], description = "下载模型：pixi run models [base|extra|image|qwen-edit|all]，不带参数默认 all（约 91GB）" }
+models = { cmd = "bash scripts/download_models.sh {{ module }}", args = [{ arg = "module", default = "all" }], description = "下载模型：pixi run models [base|extra|image|qwen-edit|consistency|all]，不带参数默认 all（约 91GB）" }
 
 # ── Comfy MCP ───────────────────────────────────────────────────────────
 # 只有第三方 artokun MCP 这一套（supervisord 托管，Streamable HTTP，宿主 9100）：

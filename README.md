@@ -20,7 +20,7 @@
 - WebUI + REST API（ComfyUI 原生）
 - 内置 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
 - **二次元生图（galgame 素材）**：内置 3 个 SDXL 动漫底模工作流 —— 场景图（背景）、9 向人物设定表（单图 3×3）、9 向人物分向单图（同 seed 一次出 9 张），配套 `pixi run models image` 一键下底模，全部是 ComfyUI 原生节点、**不用重建镜像**
-- **修图 / 改图（阿里 Qwen-Image-Edit 2511）**：内置 2 个 GGUF 修图工作流（4 步 Lightning 加速档 / 20 步质量档），中文一句话改图 —— 换背景、改光线、去路人、换装、改图中文字、两图融合；配套 `pixi run models qwen-edit` 一键下权重（GGUF 量化 + `--lowvram` 让 20B 模型跑在 12GB 显存上）。这条链路多装一个 ComfyUI-GGUF 节点，**需要重建镜像**
+- **修图 / 改图（阿里 Qwen-Image-Edit 2511）**：内置 **4 个** GGUF 工作流 —— 一句话改图（4 步 Lightning / 20 步质量档）、**角色 / 场景可控编辑**（双参考图：图 1 锁角色或场景，图 2 给表情 / 角度 / 风格；含 mask 局部重绘）、**多机位**（96 个机位由提示词指定，多角度 LoRA）；中文指令即可换背景、改光线、去路人、换装、改图中文字、两图融合，以及「同一张定妆图换表情 / 换角度 / 换时段」。配套 `pixi run models qwen-edit`（约 16GB）与 `pixi run models consistency`（多机位 LoRA，约 0.3GB）一键下权重（GGUF 量化 + `--lowvram` 让 20B 模型跑在 12GB 显存上）。这条链路多装一个 ComfyUI-GGUF 节点，**需要重建镜像**
 - WebUI 认证可一键关闭（局域网自用、免每次输密码）
 - 模型一键下载（魔搭源、断点续传、已下载自动跳过）
 
@@ -30,7 +30,7 @@
 |---|---|---|
 | GPU | NVIDIA 12GB 显存（RTX 3060 实测） | 24GB+ 显存（更快、可跑更高分辨率） |
 | 系统内存 | 32GB | 64GB（offload 稳定） |
-| 磁盘 | 45GB 可用（二次元生图另加约 7GB，Qwen 修图另加约 16GB） | NVMe SSD |
+| 磁盘 | 45GB 可用（二次元生图另加约 7GB，Qwen 修图另加约 16GB + 多机位 LoRA 0.3GB） | NVMe SSD |
 | 软件 | Docker + nvidia-container-toolkit | Linux / WSL2 |
 
 > 非 NVIDIA（AMD ROCm / Apple Silicon）请参考社区方案。
@@ -45,6 +45,7 @@
 | extra | 参考生视频主模型（ref2va）+ Fun ControlNet 控制补丁 + R2V Turbo LoRA + SDPose 姿态提取 | 约 25GB | `pixi run models extra` |
 | image | 二次元插画底模 Illustrious XL v2.0（默认）/ Animagine XL 4.0（SDXL，单文件 checkpoint） | 约 6.9GB | `pixi run models image` |
 | qwen-edit | Qwen-Image-Edit-2511 修图链路（GGUF 主模型 + Qwen2.5-VL 文本编码器 + mmproj + VAE + 4 步 LoRA） | 约 16GB | `pixi run models qwen-edit` |
+| consistency | 角色一致性：多机位 LoRA（96 个机位，配 `qwen_image_edit_multiangle` 用） | 约 0.3GB | `pixi run models consistency` |
 
 ```bash
 pixi run models                 # 不带参数 = all：上面全部，约 91GB（默认）
@@ -52,6 +53,7 @@ pixi run models base            # 基础视频模型，约 43GB
 pixi run models extra           # 参考 / 控制模型，约 25GB
 pixi run models image           # 二次元插画底模，约 6.9GB
 pixi run models qwen-edit       # Qwen 修图链路，约 16GB
+pixi run models consistency     # 多机位 LoRA（角色多视角），约 0.3GB
 IMAGE_MODELS=all pixi run models image                      # 两个二次元底模都下
 QWEN_EDIT_QUANT=Q4_K_S pixi run models qwen-edit            # 修图主模型换 12.4GB 画质档
 MODELS_DIR=/data/ai-models/comfy-h3 pixi run models base    # 下到外部大盘
@@ -119,7 +121,16 @@ pixi run models image      # 下底模（约 6.9GB）
 pixi run models qwen-edit      # 下权重（约 16GB，GGUF）
 ```
 
-这条链路需要先重建镜像（多一个 ComfyUI-GGUF 节点）。之后用 `qwen_image_edit_gguf_lightning`（4 步，批量出素材）或 `qwen_image_edit_gguf`（20 步，质量档），给一张图 + 一句中文指令即可改图。细节见 [docs/image-edit.md](docs/image-edit.md)。
+这条链路需要先重建镜像（多一个 ComfyUI-GGUF 节点）。四个工作流：
+
+| 工作流 | 用途 |
+|---|---|
+| `qwen_image_edit_gguf_lightning` | 单图 + 一句中文指令改图（4 步，批量出素材） |
+| `qwen_image_edit_gguf` | 同上，20 步质量档 |
+| `qwen_image_edit_reference` | **角色 / 场景可控编辑**：图 1 = 基准图（锁定长相 / 构图 / 上色）、图 2 = 表情 / 角度 / 风格参考，另有 mask 局部重绘分支（补全残图 / 只改一小块） |
+| `qwen_image_edit_multiangle` | **多机位**：一张基准图 + 机位提示词出多视角（需 `pixi run models consistency`） |
+
+「稳定人物、稳定场景」的用法与调参见 [docs/image-edit.md](docs/image-edit.md#4-角色--场景一致性两个新工作流)。
 
 ### 5. AI 辅助：用 MCP 驱动 ComfyUI
 
