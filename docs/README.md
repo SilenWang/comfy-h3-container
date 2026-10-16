@@ -10,7 +10,7 @@
 | [video.md](video.md) | 视频生成：T2V / I2V 工作流与加速配置（Turbo / SageAttention / 文本编码器卸载） |
 | [video-reference.md](video-reference.md) | 更多参考方式：R2V 参考生视频、Fun ControlNet 动作控制、多帧参考 |
 | [image-anime.md](image-anime.md) | 二次元插画生图：场景图与 9 向人物设定素材 |
-| [image-edit.md](image-edit.md) | 修图：Qwen-Image-Edit 指令式改图（GGUF，12GB 显存可跑） |
+| [image-edit.md](image-edit.md) | 修图与角色 / 场景一致性：Qwen-Image-Edit 指令式改图、双参考图编辑、mask 局部重绘、多机位（GGUF，12GB 显存可跑） |
 | [mcp.md](mcp.md) | 用 MCP 驱动 ComfyUI（artokun/comfyui-mcp，容器内托管） |
 | [performance.md](performance.md) | 实测性能（RTX 3060 12GB） |
 | [limitations.md](limitations.md) | 已知限制 |
@@ -20,11 +20,12 @@
 
 ```bash
 # 模型下载（唯一入口：一个脚本 + 一个 pixi 任务，模块名作为参数；下载源固定魔搭 ModelScope）
-pixi run models             # 不带参数 = all：上面四个模块全部，约 91GB（默认）
+pixi run models             # 不带参数 = all：上面五个模块全部，约 91GB（默认）
 pixi run models base        # 基础视频模型，约 43GB
 pixi run models extra       # 参考 / 控制模型（R2V + 动作控制），约 25GB
 pixi run models image       # 二次元插画底模，约 6.9GB
 pixi run models qwen-edit   # Qwen-Image-Edit 修图链路，约 16GB
+pixi run models consistency # 角色一致性：多机位 LoRA，约 0.3GB
 
 # 镜像与容器
 pixi run build && pixi run build-status   # 后台构建 + 续建（推荐）
@@ -36,4 +37,4 @@ pixi run fix-sage-attn      # 现场补装 SageAttention（无需重建镜像）
 pixi run mcp-config         # 打印 MCP 客户端配置片段
 ```
 
-`models` 是唯一的模型下载任务，模块名作为参数；`all`（不传参数的默认值）等价于依次跑 base / extra / image / qwen-edit。
+`models` 是唯一的模型下载任务，模块名作为参数；`all`（不传参数的默认值）等价于依次跑 base / extra / image / qwen-edit / consistency。

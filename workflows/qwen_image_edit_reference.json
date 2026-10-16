@@ -1,0 +1,1080 @@
+{
+  "id": "1855b29e-967f-60f3-2035-b80a065ec91e",
+  "revision": 0,
+  "last_node_id": 21,
+  "last_link_id": 27,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -3120,
+        -220
+      ],
+      "size": [
+        620,
+        1180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "title": "Note: 用法",
+      "widgets_values": [
+        "## Qwen-Image-Edit 2511 · 角色 / 场景可控编辑（GGUF，12GB 显存可跑）\n\n和 `qwen_image_edit_gguf_lightning` 的区别：这里 **`图 2` 默认已经接到 `image2`**，也就是「两张图 + 一句话」：\n`图 1` 锁住角色 / 场景，`图 2` 提供表情 / 角度 / 风格参考，指令只改该改的地方。另外多了 **mask 局部重绘**分支。\n\n**先下模型**：`pixi run models qwen-edit`（约 16GB，已下过会自动跳过）\n\n### 用法 A：角色换表情 / 换角度（同一张脸）\n- `图 1：角色基准图` → 这个角色的**定妆图**（一张满意的正面全身图，全项目复用同一张）\n- `图 2：参考图` → 表情 / 角度的参考；想更稳就用**同一张基准图的脸部裁剪**\n- 指令示例：\n  - `图 1 角色的表情改成图 2 的表情，脸型 / 发型 / 瞳色 / 服装 / 构图 / 上色完全保持不变`\n  - `保持图 1 角色的长相与服装，改成图 2 的姿势`\n  - `保持图 1 角色不变，把上色改成图 2 的画风`\n\n### 用法 B：场景换时段 / 天气（结构不漂）\n- `图 1：场景基准图` → 定稿背景图；`图 2` 不放图也不影响运行\n- 指令示例：`把白天改成黄昏，加暖色逆光，建筑物位置与透视保持不变`\n- 同一地点要多时段：`图 2` 放另一时段的同地点图，指令写 `把图 1 的时段 / 天气改成图 2 的样子`\n\n### 用法 C：补全残图（只改缺的那一块，默认关着）\n1. 右键 `图 1` → `Open in MaskEditor`，把**要重绘的区域涂白** → Save（写进该图的 alpha 通道）\n2. 右键 `Grow Mask` 和 `Set Latent Noise Mask` → 取消 `Bypass`（紫色半透明消失）\n3. 指令写 `补全缺失的部分，线条 / 上色 / 画风与周围保持一致`\n- 只有涂白区域会被重画，其它像素一个都不动 → 人物身份 / 构图天然保留\n- `Grow Mask` 的 `expand`（默认 16）往四周多扩一点避免接缝；mask 是原图分辨率，缩放后可能有十几像素偏差，靠它补偿\n- 判断有没有生效：输出和输入一模一样 = mask 没画（全黑）或分支还在 Bypass\n\n### 记住三句\n- 要「人物 / 场景不漂」→ **每次都带图 1**，指令里写明「保持 XX 不变」\n- 指令里用「图 1 / 图 2」指明哪张是哪个\n- 采样是 4 步 / CFG 1.0（Lightning 4 步 LoRA）；若日志报 LoRA 异常，把该 LoRA 的 `strength_model` 设 0，KSampler 改 `steps=20, cfg=4.0`\n\n### 12GB 提示\n- 主模型 GGUF Q3_K_S 9.2GB + 文本编码器 4.7GB，靠 `--lowvram` + CPU offload 跑；**首次 Queue 加载慢是正常的**\n- 内存不够就调高 `docker-compose.yml` 的 `memory: 24G`\n- 想提画质：`QWEN_EDIT_QUANT=Q4_K_S pixi run models qwen-edit`（12.4GB，更慢、更吃内存）"
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 2,
+      "type": "UnetLoaderGGUF",
+      "pos": [
+        -2480,
+        -220
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UnetLoaderGGUF"
+      },
+      "title": "模型：Qwen-Image-Edit 2511 (GGUF)",
+      "widgets_values": [
+        "qwen-image-edit-2511-Q3_K_S.gguf"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoaderGGUF",
+      "pos": [
+        -2480,
+        -60
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            8,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoaderGGUF"
+      },
+      "title": "文本编码器：Qwen2.5-VL-7B (GGUF)",
+      "widgets_values": [
+        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+        "qwen_image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        -2480,
+        100
+      ],
+      "size": [
+        400,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            5,
+            9,
+            14,
+            26
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "title": "VAE",
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -2000,
+        -220
+      ],
+      "size": [
+        360,
+        430
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "图 1：角色 / 场景基准图",
+      "widgets_values": [
+        "qwen_edit_reference_base.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "pos": [
+        -2000,
+        240
+      ],
+      "size": [
+        360,
+        430
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "图 2：参考图（表情 / 角度 / 风格）",
+      "widgets_values": [
+        "qwen_edit_reference_ref.png",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "FluxKontextImageScale",
+      "pos": [
+        -1580,
+        -220
+      ],
+      "size": [
+        300,
+        46
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4,
+            6,
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextImageScale"
+      },
+      "title": "基准图 → 缩放到 Kontext 尺寸"
+    },
+    {
+      "id": 8,
+      "type": "FluxKontextImageScale",
+      "pos": [
+        -1580,
+        180
+      ],
+      "size": [
+        300,
+        46
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7,
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextImageScale"
+      },
+      "title": "参考图 → 缩放到 Kontext 尺寸"
+    },
+    {
+      "id": 9,
+      "type": "VAEEncode",
+      "pos": [
+        -1580,
+        -120
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "title": "基准图 → latent"
+    },
+    {
+      "id": 10,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1200,
+        -220
+      ],
+      "size": [
+        440,
+        200
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 8
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 9,
+          "shape": 7
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 6,
+          "shape": 7
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 7,
+          "shape": 7
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "指令：怎么改（中文即可）",
+      "widgets_values": [
+        "以图 1 的角色为准，把表情改成图 2 的表情，脸型 / 发型 / 瞳色 / 服装 / 构图 / 上色完全保持不变"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -700,
+        -220
+      ],
+      "size": [
+        320,
+        82
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "title": "参考图注入方式（正向）",
+      "widgets_values": [
+        "index_timestep_zero"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1200,
+        420
+      ],
+      "size": [
+        440,
+        200
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 13
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 14,
+          "shape": 7
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 11,
+          "shape": 7
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 12,
+          "shape": 7
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "负向提示词（保持空）",
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 13,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -700,
+        420
+      ],
+      "size": [
+        320,
+        82
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "title": "参考图注入方式（负向）",
+      "widgets_values": [
+        "index_timestep_zero"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -2480,
+        220
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "title": "4 步加速 LoRA (Lightning V1.0)",
+      "widgets_values": [
+        "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+        1.0
+      ]
+    },
+    {
+      "id": 15,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        -2000,
+        700
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "title": "Model Sampling (shift 3.1)",
+      "widgets_values": [
+        3.1
+      ]
+    },
+    {
+      "id": 16,
+      "type": "CFGNorm",
+      "pos": [
+        -1650,
+        700
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CFGNorm"
+      },
+      "title": "CFG Norm",
+      "widgets_values": [
+        1,
+        false
+      ]
+    },
+    {
+      "id": 17,
+      "type": "GrowMask",
+      "pos": [
+        -1200,
+        700
+      ],
+      "size": [
+        320,
+        82
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GrowMask"
+      },
+      "title": "③ mask 外扩（用法 C 用；默认 Bypass）",
+      "widgets_values": [
+        16,
+        true
+      ]
+    },
+    {
+      "id": 18,
+      "type": "SetLatentNoiseMask",
+      "pos": [
+        -850,
+        700
+      ],
+      "size": [
+        300,
+        60
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 19
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SetLatentNoiseMask"
+      },
+      "title": "③ 只重绘 mask 区域（默认 Bypass）"
+    },
+    {
+      "id": 19,
+      "type": "KSampler",
+      "pos": [
+        -450,
+        640
+      ],
+      "size": [
+        340,
+        262
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 21
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 22
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 23
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "title": "KSampler (4 步 / CFG 1.0)",
+      "widgets_values": [
+        123456789,
+        "randomize",
+        4,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 20,
+      "type": "VAEDecode",
+      "pos": [
+        0,
+        700
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 25
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "title": "VAE 解码"
+    },
+    {
+      "id": 21,
+      "type": "SaveImage",
+      "pos": [
+        0,
+        800
+      ],
+      "size": [
+        480,
+        520
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "title": "Save (qwen_edit/reference)",
+      "widgets_values": [
+        "qwen_edit/reference"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      5,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      5,
+      1,
+      17,
+      0,
+      "MASK"
+    ],
+    [
+      3,
+      6,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      7,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      4,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
+      6,
+      7,
+      0,
+      10,
+      2,
+      "IMAGE"
+    ],
+    [
+      7,
+      8,
+      0,
+      10,
+      3,
+      "IMAGE"
+    ],
+    [
+      8,
+      3,
+      0,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      9,
+      4,
+      0,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      10,
+      10,
+      0,
+      11,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      11,
+      7,
+      0,
+      12,
+      2,
+      "IMAGE"
+    ],
+    [
+      12,
+      8,
+      0,
+      12,
+      3,
+      "IMAGE"
+    ],
+    [
+      13,
+      3,
+      0,
+      12,
+      0,
+      "CLIP"
+    ],
+    [
+      14,
+      4,
+      0,
+      12,
+      1,
+      "VAE"
+    ],
+    [
+      15,
+      12,
+      0,
+      13,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      16,
+      2,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      17,
+      14,
+      0,
+      15,
+      0,
+      "MODEL"
+    ],
+    [
+      18,
+      15,
+      0,
+      16,
+      0,
+      "MODEL"
+    ],
+    [
+      19,
+      9,
+      0,
+      18,
+      0,
+      "LATENT"
+    ],
+    [
+      20,
+      17,
+      0,
+      18,
+      1,
+      "MASK"
+    ],
+    [
+      21,
+      16,
+      0,
+      19,
+      0,
+      "MODEL"
+    ],
+    [
+      22,
+      11,
+      0,
+      19,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      23,
+      13,
+      0,
+      19,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      24,
+      18,
+      0,
+      19,
+      3,
+      "LATENT"
+    ],
+    [
+      25,
+      19,
+      0,
+      20,
+      0,
+      "LATENT"
+    ],
+    [
+      26,
+      4,
+      0,
+      20,
+      1,
+      "VAE"
+    ],
+    [
+      27,
+      20,
+      0,
+      21,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        1800,
+        700
+      ]
+    }
+  },
+  "version": 0.4
+}

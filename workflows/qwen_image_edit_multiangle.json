@@ -1,0 +1,950 @@
+{
+  "id": "c44c107d-a2f8-b7c2-5fde-18d2620efe73",
+  "revision": 0,
+  "last_node_id": 19,
+  "last_link_id": 22,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -3120,
+        -220
+      ],
+      "size": [
+        620,
+        1100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "title": "Note: 用法",
+      "widgets_values": [
+        "## Qwen-Image-Edit 2511 · 多机位（多角度 LoRA，12GB 显存可跑）\n\n**先下 LoRA（0.295GB）**：`pixi run models consistency`\n\n**干什么用**：给一张角色基准图，按**明确写出的机位**出图（96 个机位 = 4 仰俯 × 8 方位 × 3 距离）。\n这才是真正的「同脸多视角」——比共用 seed 抽 9 张稳得多，产出可直接当角色设定表 / 表情差分素材。\n\n### 用法\n1. `图 1：角色基准图` → 上传定妆图（与 `qwen_image_edit_reference` 用同一张最好）\n2. `机位指令` → 按 `<sks> [方位] [仰俯] [距离]` 写：\n   - `<sks> front view eye-level shot medium shot`（正面 · 平视 · 中景）\n   - `<sks> right side view high-angle shot close-up`（右侧 · 俯视 · 特写）\n   - `<sks> back view low-angle shot wide shot`（背面 · 仰视 · 远景）\n   词表见右侧 Note「机位词表（96 个）」，换一个词就是换一个机位\n3. 想要一圈 8 个方位：固定 `图 1` 与其它词，只改方位词重复 Queue\n\n### 接线（照 fal 官方工作流，只把主模型换成 GGUF）\n`Unet Loader (GGUF)` → `多角度 LoRA` → `Lightning 4 步 LoRA` → `Model Sampling (shift 3.1)` → `CFG Norm` → `KSampler`\n`图 1` → `FluxKontextImageScale` → `TextEncodeQwenImageEditPlus`（image1）→ `Edit Model Reference Method` → `KSampler`\n（`Edit Model Reference Method` 是官方给「别人重新打包的权重」准备的；我们用的是 unsloth 的 GGUF 重打包，所以保留）\n\n### 12GB 上的注意\n- 两个 LoRA 叠在 **Q3_K_S 量化**主模型上，属 ComfyUI-GGUF 的 experimental 路径，**本仓库未实测**：\n  报错 / 画面糊就先把 `多角度 LoRA` 的 `strength_model` 设 0（确认底座本身能跑），\n  或换 `QWEN_EDIT_QUANT=Q4_K_S pixi run models qwen-edit`（12.4GB，更慢）\n- 机位是**精细几何控制**，量化越狠越容易飘：效果不满意优先提量化档，而不是加步数\n\n### 参考\n- LoRA：`fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA`（Apache-2.0，魔搭有同名仓库）\n- 上游文档自带 `comfyui-workflow-multiple-angles.json`，本工作流与它接线一致"
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 2,
+      "type": "UnetLoaderGGUF",
+      "pos": [
+        -2480,
+        -220
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UnetLoaderGGUF"
+      },
+      "title": "模型：Qwen-Image-Edit 2511 (GGUF)",
+      "widgets_values": [
+        "qwen-image-edit-2511-Q3_K_S.gguf"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoaderGGUF",
+      "pos": [
+        -2480,
+        -60
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            5,
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoaderGGUF"
+      },
+      "title": "文本编码器：Qwen2.5-VL-7B (GGUF)",
+      "widgets_values": [
+        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+        "qwen_image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        -2480,
+        100
+      ],
+      "size": [
+        400,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            6,
+            10,
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "title": "VAE",
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -2000,
+        -220
+      ],
+      "size": [
+        360,
+        430
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "图 1：角色基准图",
+      "widgets_values": [
+        "qwen_edit_reference_base.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "FluxKontextImageScale",
+      "pos": [
+        -1580,
+        -220
+      ],
+      "size": [
+        300,
+        46
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            4,
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextImageScale"
+      },
+      "title": "基准图 → 缩放到 Kontext 尺寸"
+    },
+    {
+      "id": 7,
+      "type": "VAEEncode",
+      "pos": [
+        -1580,
+        -120
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "title": "基准图 → latent"
+    },
+    {
+      "id": 8,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1200,
+        -220
+      ],
+      "size": [
+        440,
+        180
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 5
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 6,
+          "shape": 7
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 4,
+          "shape": 7
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "机位指令（<sks> 方位 仰俯 距离）",
+      "widgets_values": [
+        "<sks> front view eye-level shot medium shot"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -700,
+        -220
+      ],
+      "size": [
+        320,
+        82
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "title": "参考图注入方式（正向）",
+      "widgets_values": [
+        "index_timestep_zero"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -1200,
+        220
+      ],
+      "size": [
+        440,
+        180
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 10,
+          "shape": 7
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 8,
+          "shape": 7
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "image3",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "title": "负向提示词（保持空）",
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 11,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -700,
+        220
+      ],
+      "size": [
+        320,
+        82
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "title": "参考图注入方式（负向）",
+      "widgets_values": [
+        "index_timestep_zero"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -2480,
+        220
+      ],
+      "size": [
+        460,
+        82
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "title": "多角度 LoRA（机位控制，strength 设 0 = 关掉）",
+      "widgets_values": [
+        "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+        1.0
+      ]
+    },
+    {
+      "id": 13,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -1950,
+        220
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "title": "4 步加速 LoRA (Lightning V1.0)",
+      "widgets_values": [
+        "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+        1.0
+      ]
+    },
+    {
+      "id": 14,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        -1500,
+        220
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "title": "Model Sampling (shift 3.1)",
+      "widgets_values": [
+        3.1
+      ]
+    },
+    {
+      "id": 15,
+      "type": "CFGNorm",
+      "pos": [
+        -1100,
+        220
+      ],
+      "size": [
+        300,
+        82
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CFGNorm"
+      },
+      "title": "CFG Norm",
+      "widgets_values": [
+        1,
+        false
+      ]
+    },
+    {
+      "id": 16,
+      "type": "KSampler",
+      "pos": [
+        -700,
+        400
+      ],
+      "size": [
+        340,
+        262
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 16
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 17
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 18
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "title": "KSampler (4 步 / CFG 1.0)",
+      "widgets_values": [
+        123456789,
+        "randomize",
+        4,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 17,
+      "type": "VAEDecode",
+      "pos": [
+        -250,
+        400
+      ],
+      "size": [
+        250,
+        60
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 20
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "title": "VAE 解码"
+    },
+    {
+      "id": 18,
+      "type": "SaveImage",
+      "pos": [
+        -250,
+        500
+      ],
+      "size": [
+        480,
+        520
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "title": "Save (qwen_edit/multiangle)",
+      "widgets_values": [
+        "qwen_edit/multiangle"
+      ]
+    },
+    {
+      "id": 19,
+      "type": "Note",
+      "pos": [
+        -1200,
+        700
+      ],
+      "size": [
+        560,
+        760
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note"
+      },
+      "title": "机位词表（96 个）",
+      "widgets_values": [
+        "<sks> front view low-angle shot close-up\n<sks> front-right quarter view low-angle shot close-up\n<sks> right side view low-angle shot close-up\n<sks> back-right quarter view low-angle shot close-up\n<sks> back view low-angle shot close-up\n<sks> back-left quarter view low-angle shot close-up\n<sks> left side view low-angle shot close-up\n<sks> front-left quarter view low-angle shot close-up\n<sks> front view eye-level shot close-up\n<sks> front-right quarter view eye-level shot close-up\n<sks> right side view eye-level shot close-up\n<sks> back-right quarter view eye-level shot close-up\n<sks> back view eye-level shot close-up\n<sks> back-left quarter view eye-level shot close-up\n<sks> left side view eye-level shot close-up\n<sks> front-left quarter view eye-level shot close-up\n<sks> front view elevated shot close-up\n<sks> front-right quarter view elevated shot close-up\n<sks> right side view elevated shot close-up\n<sks> back-right quarter view elevated shot close-up\n<sks> back view elevated shot close-up\n<sks> back-left quarter view elevated shot close-up\n<sks> left side view elevated shot close-up\n<sks> front-left quarter view elevated shot close-up\n<sks> front view high-angle shot close-up\n<sks> front-right quarter view high-angle shot close-up\n<sks> right side view high-angle shot close-up\n<sks> back-right quarter view high-angle shot close-up\n<sks> back view high-angle shot close-up\n<sks> back-left quarter view high-angle shot close-up\n<sks> left side view high-angle shot close-up\n<sks> front-left quarter view high-angle shot close-up\n<sks> front view low-angle shot medium shot\n<sks> front-right quarter view low-angle shot medium shot\n<sks> right side view low-angle shot medium shot\n<sks> back-right quarter view low-angle shot medium shot\n<sks> back view low-angle shot medium shot\n<sks> back-left quarter view low-angle shot medium shot\n<sks> left side view low-angle shot medium shot\n<sks> front-left quarter view low-angle shot medium shot\n<sks> front view eye-level shot medium shot\n<sks> front-right quarter view eye-level shot medium shot\n<sks> right side view eye-level shot medium shot\n<sks> back-right quarter view eye-level shot medium shot\n<sks> back view eye-level shot medium shot\n<sks> back-left quarter view eye-level shot medium shot\n<sks> left side view eye-level shot medium shot\n<sks> front-left quarter view eye-level shot medium shot\n<sks> front view elevated shot medium shot\n<sks> front-right quarter view elevated shot medium shot\n<sks> right side view elevated shot medium shot\n<sks> back-right quarter view elevated shot medium shot\n<sks> back view elevated shot medium shot\n<sks> back-left quarter view elevated shot medium shot\n<sks> left side view elevated shot medium shot\n<sks> front-left quarter view elevated shot medium shot\n<sks> front view high-angle shot medium shot\n<sks> front-right quarter view high-angle shot medium shot\n<sks> right side view high-angle shot medium shot\n<sks> back-right quarter view high-angle shot medium shot\n<sks> back view high-angle shot medium shot\n<sks> back-left quarter view high-angle shot medium shot\n<sks> left side view high-angle shot medium shot\n<sks> front-left quarter view high-angle shot medium shot\n<sks> front view low-angle shot wide shot\n<sks> front-right quarter view low-angle shot wide shot\n<sks> right side view low-angle shot wide shot\n<sks> back-right quarter view low-angle shot wide shot\n<sks> back view low-angle shot wide shot\n<sks> back-left quarter view low-angle shot wide shot\n<sks> left side view low-angle shot wide shot\n<sks> front-left quarter view low-angle shot wide shot\n<sks> front view eye-level shot wide shot\n<sks> front-right quarter view eye-level shot wide shot\n<sks> right side view eye-level shot wide shot\n<sks> back-right quarter view eye-level shot wide shot\n<sks> back view eye-level shot wide shot\n<sks> back-left quarter view eye-level shot wide shot\n<sks> left side view eye-level shot wide shot\n<sks> front-left quarter view eye-level shot wide shot\n<sks> front view elevated shot wide shot\n<sks> front-right quarter view elevated shot wide shot\n<sks> right side view elevated shot wide shot\n<sks> back-right quarter view elevated shot wide shot\n<sks> back view elevated shot wide shot\n<sks> back-left quarter view elevated shot wide shot\n<sks> left side view elevated shot wide shot\n<sks> front-left quarter view elevated shot wide shot\n<sks> front view high-angle shot wide shot\n<sks> front-right quarter view high-angle shot wide shot\n<sks> right side view high-angle shot wide shot\n<sks> back-right quarter view high-angle shot wide shot\n<sks> back view high-angle shot wide shot\n<sks> back-left quarter view high-angle shot wide shot\n<sks> left side view high-angle shot wide shot\n<sks> front-left quarter view high-angle shot wide shot"
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    }
+  ],
+  "links": [
+    [
+      1,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      6,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      4,
+      0,
+      7,
+      1,
+      "VAE"
+    ],
+    [
+      4,
+      6,
+      0,
+      8,
+      2,
+      "IMAGE"
+    ],
+    [
+      5,
+      3,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      6,
+      4,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      7,
+      8,
+      0,
+      9,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      6,
+      0,
+      10,
+      2,
+      "IMAGE"
+    ],
+    [
+      9,
+      3,
+      0,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      10,
+      4,
+      0,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      11,
+      10,
+      0,
+      11,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      12,
+      2,
+      0,
+      12,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      12,
+      0,
+      13,
+      0,
+      "MODEL"
+    ],
+    [
+      14,
+      13,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      0,
+      "MODEL"
+    ],
+    [
+      16,
+      15,
+      0,
+      16,
+      0,
+      "MODEL"
+    ],
+    [
+      17,
+      9,
+      0,
+      16,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      18,
+      11,
+      0,
+      16,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      19,
+      7,
+      0,
+      16,
+      3,
+      "LATENT"
+    ],
+    [
+      20,
+      16,
+      0,
+      17,
+      0,
+      "LATENT"
+    ],
+    [
+      21,
+      4,
+      0,
+      17,
+      1,
+      "VAE"
+    ],
+    [
+      22,
+      17,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        1800,
+        700
+      ]
+    }
+  },
+  "version": 0.4
+}

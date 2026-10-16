@@ -10,4 +10,4 @@
 
 > 注意：`SageAttention` 只在 Ampere/Ada 及以后有收益（**RTX 30/40 系约 1.3–2×，Blackwell 较小**）；`H3EvictTextEncoder` 在 `--gpu-only` 模式下是 no-op。若 SageAttention 构建失败，把 `PathchSageAttentionKJ` 切到 `auto`（V1 Triton）或 `disabled` 即可无损回退；既有容器缺失时用 `pixi run fix-sage-attn` 现场补装（见 [troubleshooting.md](troubleshooting.md)）。
 
-**未实测部分**：本文表格只覆盖视频链路。二次元生图（SDXL）与 Qwen-Image-Edit 修图的耗时本仓库没有 12GB 显卡上的实测数据，相关预期见 [image-anime.md](image-anime.md) 与 [image-edit.md](image-edit.md#4-12gb-显存上的预期与调参)。
+**未实测部分**：本文表格只覆盖视频链路。二次元生图（SDXL）与 Qwen-Image-Edit 修图的耗时本仓库没有 12GB 显卡上的实测数据，相关预期见 [image-anime.md](image-anime.md) 与 [image-edit.md](image-edit.md#5-12gb-显存上的预期与调参)。

@@ -2,14 +2,15 @@
 # 模型下载（本仓库唯一的模型下载入口）：按模块下载对应模型。
 # 下载源固定为魔搭 ModelScope（国内速度快、连接稳定），不使用 HuggingFace。
 #
-#   bash scripts/download_models.sh            # 等价于 all（默认）
-#   bash scripts/download_models.sh base       # 基础视频模型（T2V / I2V / 首尾帧），约 43GB
-#   bash scripts/download_models.sh extra      # 参考 / 控制模型（R2V + 动作控制），约 25GB
-#   bash scripts/download_models.sh image      # 二次元插画底模（SDXL），约 6.9GB
-#   bash scripts/download_models.sh qwen-edit  # Qwen-Image-Edit 修图链路（GGUF），约 16GB
-#   bash scripts/download_models.sh all        # 上面全部，约 91GB
+#   bash scripts/download_models.sh             # 等价于 all（默认）
+#   bash scripts/download_models.sh base        # 基础视频模型（T2V / I2V / 首尾帧），约 43GB
+#   bash scripts/download_models.sh extra       # 参考 / 控制模型（R2V + 动作控制），约 25GB
+#   bash scripts/download_models.sh image       # 二次元插画底模（SDXL），约 6.9GB
+#   bash scripts/download_models.sh qwen-edit   # Qwen-Image-Edit 修图链路（GGUF），约 16GB
+#   bash scripts/download_models.sh consistency # 角色一致性：多机位 LoRA，约 0.3GB
+#   bash scripts/download_models.sh all         # 上面全部，约 91GB
 #
-# 也可走 pixi：pixi run models [base|extra|image|qwen-edit|all]（不带参数即 all），
+# 也可走 pixi：pixi run models [base|extra|image|qwen-edit|consistency|all]（不带参数即 all），
 # 仓库内只有 models 这一个 pixi 任务，模块名作为参数传入。
 #
 # 行为：
@@ -36,6 +37,7 @@ usage() {
   extra       参考 / 控制模型（R2V + 动作控制 + SDPose），约 25GB
   image       二次元插画底模（SDXL），约 6.9GB
   qwen-edit   Qwen-Image-Edit 修图链路（GGUF），约 16GB
+  consistency 角色一致性：多机位 LoRA（Qwen-Image-Edit），约 0.3GB
   all         以上全部，约 91GB（默认，不传模块即它）
 
 可选环境变量：
@@ -236,21 +238,35 @@ download_qwen_edit() {
   fi
 }
 
+# ── consistency：角色一致性（多机位 LoRA），约 0.3GB ──────────────────────
+# 给 Qwen-Image-Edit 用的多角度相机控制 LoRA：96 个机位（4 仰俯 × 8 方位 × 3
+# 距离），提示词形如 `<sks> front view eye-level shot medium shot`。用于
+# workflows/qwen_image_edit_multiangle.json（多机位出图）与
+# workflows/qwen_image_edit_reference.json（双参考图编辑）。
+# 相机控制属精细几何控制，量化档越高越稳；Q3_K_S 上的实测效果本仓库未验证。
+download_consistency() {
+  echo "### 角色一致性：多机位 LoRA（约 0.3GB）"
+  dl "$(url fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA qwen-image-edit-2511-multiple-angles-lora.safetensors)" \
+     "$MODELS/loras/qwen-image-edit-2511-multiple-angles-lora.safetensors"
+}
+
 GROUP="${1:-all}"
 case "$GROUP" in
-  base)           download_base ;;
-  extra)          download_extra ;;
-  image)          download_image ;;
-  qwen-edit|qwen) download_qwen_edit ;;
+  base)               download_base ;;
+  extra)              download_extra ;;
+  image)              download_image ;;
+  qwen-edit|qwen)     download_qwen_edit ;;
+  consistency|angles) download_consistency ;;
   all)
     download_base
     download_extra
     download_image
     download_qwen_edit
+    download_consistency
     ;;
   -h|--help|help) usage; exit 0 ;;
   *)
-    echo "未知的模型模块：$GROUP（可选：base | extra | image | qwen-edit | all）" >&2
+    echo "未知的模型模块：$GROUP（可选：base | extra | image | qwen-edit | consistency | all）" >&2
     echo >&2
     usage >&2
     exit 2

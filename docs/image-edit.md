@@ -6,6 +6,8 @@
 |---|---|---|
 | `qwen_image_edit_gguf_lightning.json` | 4 步 / CFG 1.0（Lightning 4 步 LoRA） | **批量出素材推荐**，一次采样快得多 |
 | `qwen_image_edit_gguf.json` | 20 步 / CFG 4.0 | 质量档，无 LoRA，最接近官方权重行为 |
+| `qwen_image_edit_reference.json` | 4 步 / CFG 1.0 | **角色 / 场景可控编辑**：双参考图 + mask 局部重绘（见第 4 节） |
+| `qwen_image_edit_multiangle.json` | 4 步 / CFG 1.0 | **多机位**：96 个机位由提示词指定，需 `pixi run models consistency`（见第 4 节） |
 
 两个工作流都在画布左上角贴了 `MarkdownNote`（用法 / 指令示例 / 12GB 提示），接线一致：`Load Image` → 指令 → `KSampler` → `Save Image`，输出在 `output/qwen_edit/`。
 
@@ -68,7 +70,63 @@ pixi run models qwen-edit        # 魔搭下载，支持断点续传
 
 **换姿势 / 换角度、需要严格构图控制时它不擅长**：那是 SDXL + ControlNet（OpenPose）的活；纯去杂物 / 修手也可以先用 SDXL 的 inpaint 链路（零下载），按需挑。
 
-## 4. 12GB 显存上的预期与调参
+## 4. 角色 / 场景一致性（两个新工作流）
+
+「稳定人物、稳定场景」靠的不是换更大的模型，而是**每次带参考图**。前面那两个工作流只有
+「单图 + 一句指令」，`图 2` 从来没接上；这两个工作流把参考图通路补齐：
+
+| 工作流 | 干什么 | 与旧工作流的差别 |
+|---|---|---|
+| `qwen_image_edit_reference.json` | 图 1（角色 / 场景基准图）+ 图 2（表情 / 角度 / 风格参考）+ 一句指令 | `图 2` **默认已接到 `image2`**（正向 / 负向都接）+ mask 局部重绘分支 + `Edit Model Reference Method` |
+| `qwen_image_edit_multiangle.json` | 一张基准图 + 机位提示词 → 多视角 | 叠 **多角度 LoRA**（`pixi run models consistency`），96 个机位 |
+
+两个工作流都基于同一套 GGUF 底座（`qwen-image-edit-2511-Q3_K_S.gguf` + Qwen2.5-VL 文本编码器 + `qwen_image_vae`），**不需要额外重建镜像**。
+
+### 4.1 为什么这样就稳了
+
+不稳定的根因是**没有东西承载「角色身份」**：纯 tag 提示词 + 共用 seed 只共享噪声起点，换个表情 tag 脸就跟着换。参考图编辑把身份放到「那张基准图」里：
+
+- 图 1 = 身份 / 构图 / 上色（每次都必须带，且全项目复用同一张**定妆图**）
+- 图 2 = 只提供「要变成什么样」的那一点信息（表情 / 角度 / 画风 / 时段）
+- 指令 = 明确写清「图 1 / 图 2 各是什么」以及「哪些必须保持不变」
+
+`FluxKontextMultiReferenceLatentMethod`（界面上叫 `Edit Model Reference Method`）设成 `index_timestep_zero` 是官方给「重新打包过的权重」（我们用的 unsloth GGUF、fal 的 LoRA 都是）准备的参考图注入方式，官方模板默认带它。
+
+### 4.2 `qwen_image_edit_reference` 三种用法
+
+1. **角色换表情 / 换角度**：图 1 = 定妆图，图 2 = 表情或角度参考
+   指令：`图 1 角色的表情改成图 2 的表情，脸型 / 发型 / 瞳色 / 服装 / 构图 / 上色完全保持不变`
+   更稳的做法：图 2 用**同一张定妆图的脸部裁剪**
+2. **场景换时段 / 天气**：图 1 = 定稿背景图，指令 `把白天改成黄昏，加暖色逆光，建筑物位置与透视保持不变`
+   同一地点做多时段：图 2 放另一时段的同地点图，指令写「改成图 2 的样子」
+3. **补全残图（只改缺的那一块）**：mask 分支默认 **Bypass**，要用时
+   - 右键 `图 1` → `Open in MaskEditor` 涂白要重绘的区域 → Save
+   - 右键 `Grow Mask`、`Set Latent Noise Mask` → 取消 Bypass
+   - 指令：`补全缺失的部分，线条 / 上色 / 画风与周围保持一致`
+   - 只有涂白区域被重画，其它像素一个都不动（`Set Latent Noise Mask` 之外不受影响）；`Grow Mask` 的 `expand`（默认 16）往四周多扩一点避免接缝
+   - 输出与输入一模一样 = mask 全黑（没画）或分支还在 Bypass
+
+> mask 是原图分辨率、latent 是 `FluxKontextImageScale` 缩放后的尺寸，缩放 / 裁边会带来十几像素的偏差，`expand=16` 就是用来盖住它的。
+
+### 4.3 `qwen_image_edit_multiangle`：多机位
+
+```bash
+pixi run models consistency     # 只多下 0.295GB 的多角度 LoRA
+```
+
+提示词格式 `<sks> [方位] [仰俯] [距离]`，例如 `<sks> front view eye-level shot medium shot`；96 个机位的完整词表贴在工作流里的 `Note` 节点上（方位 8 × 仰俯 4 × 距离 3）。改一个词就是换一个机位，同一张基准图能稳定出一圈视角 —— 角色设定表 / 表情差分素材用它成批出。
+
+- 接线照 fal 官方工作流：`Unet Loader (GGUF)` → 多角度 LoRA → Lightning LoRA → `Model Sampling (shift 3.1)` → `CFG Norm` → `KSampler`
+- **量化档与 LoRA 是相互拉锯的**：机位属于精细几何控制，Q3_K_S 上效果本仓库未实测。报错 / 画面糊先把多角度 LoRA 的 `strength_model` 设 0（确认底座能跑），或换 `QWEN_EDIT_QUANT=Q4_K_S pixi run models qwen-edit`（12.4GB，更慢）
+
+### 4.4 还不够稳时往哪走
+
+参考图编辑的一致性上限受模型控制力限制（尤其纯表情差分最挑剔）。要继续提：
+
+1. 从视频抽帧 → 按清晰度 / 姿态筛选 → 用本链路修成干净图 → 攒够 15–40 张 → **训角色 LoRA**（身份固化进权重，一致性上限最高）
+2. 图 2 改用「脸部局部裁剪 + 固定 seed」，必要时多抽 3–5 张挑
+
+## 5. 12GB 显存上的预期与调参
 
 - 首次 Queue 要加载 9.2GB 主模型 + 4.7GB 文本编码器再 offload，**加载阶段就慢**，属正常
 - 出图速度：20B 模型在 12GB 卡上比 SDXL 慢一个量级。批量做素材用 Lightning 4 步档；质量档（20 步）留给单张精修
@@ -78,7 +136,7 @@ pixi run models qwen-edit        # 魔搭下载，支持断点续传
 
 > 这一节的具体耗时数字**本仓库没有 12GB 显卡上的实测**：链路、权重、参数都按官方 2511 模板与 ComfyUI 源码核对过（节点名、接线、量化档大小），但速度与稳定性请以你自己机器为准；跑不动先降量化档（`QWEN_EDIT_QUANT=Q3_K_S`）、调高内存上限。
 
-## 5. 换 fp8 文本编码器（可选，免 mmproj）
+## 6. 换 fp8 文本编码器（可选，免 mmproj）
 
 不想用 GGUF 文本编码器（或想对比效果）：
 
@@ -89,6 +147,6 @@ QWEN_EDIT_TEXT_ENC=fp8 pixi run models qwen-edit   # 额外下 9.4GB qwen_2.5_vl
 
 然后把工作流里的 `CLIPLoader (GGUF)` 换成原生 `CLIP Loader`（type 仍选 `qwen_image`），选中 `qwen_2.5_vl_7b_fp8_scaled.safetensors` 即可 —— 原生加载器不需要 mmproj，但显存占用更大。
 
-## 6. 许可
+## 7. 许可
 
 Qwen-Image-Edit-2511 及本链路用到的 GGUF 量化（unsloth）、Lightning LoRA（lightx2v）、文本编码器（Qwen2.5-VL-7B）**均为 Apache-2.0，允许商用**（含游戏素材），需随附许可副本并遵守其条款；生成内容责任在使用者。权重来源（魔搭均有同名仓库，下载脚本默认走魔搭）：[Qwen/Qwen-Image-Edit-2511](https://modelscope.cn/models/Qwen/Qwen-Image-Edit-2511)、[unsloth/Qwen-Image-Edit-2511-GGUF](https://modelscope.cn/models/unsloth/Qwen-Image-Edit-2511-GGUF)、[lightx2v/Qwen-Image-Edit-2511-Lightning](https://modelscope.cn/models/lightx2v/Qwen-Image-Edit-2511-Lightning)、[Comfy-Org/Qwen-Image_ComfyUI](https://modelscope.cn/models/Comfy-Org/Qwen-Image_ComfyUI)。
