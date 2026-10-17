@@ -55,6 +55,13 @@ services:
       COMFYUI_MCP_HTTP_TOKEN: ${COMFYUI_MCP_HTTP_TOKEN:-comfy-h3-mcp}
       # 容器内 MCP 监听端口，与上面的宿主端口映射联动（改一处即可，两端始终对齐）
       COMFYUI_MCP_PORT_LOCAL: ${COMFYUI_MCP_PORT_LOCAL:-19100}
+      # 空闲自动释放（容器内 supervisor 托管的 comfyui-idle-free 守护）：
+      # ComfyUI 跑完任务不会自己释放模型/缓存，内存受限时占用会越堆越高，后面的任务
+      # 被换页拖死（详见 docs/troubleshooting.md）。该守护在队列空闲
+      # COMFYUI_IDLE_FREE_SECONDS 秒后自动 POST /free 回收；连续批量任务不受影响
+      # （队列不空就不释放）。想优先「连续任务的模型复用速度」可把秒数调大，如 600。
+      COMFYUI_IDLE_FREE_ENABLE: ${COMFYUI_IDLE_FREE_ENABLE:-true}
+      COMFYUI_IDLE_FREE_SECONDS: ${COMFYUI_IDLE_FREE_SECONDS:-60}
     volumes:
       # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
       # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：
@@ -68,6 +75,11 @@ services:
       # WebUI 的 Workflows 列表里；在 WebUI 里保存的工作流也会落到这里。
       - ./workflows:/opt/ComfyUI/user/default/workflows
     # 可选：限制资源
+    # 注意：ComfyUI 不会在任务结束后释放模型/缓存，所以这个上限要能装下「当前工作流
+    # 需要的模型 + 上一轮遗留的常驻占用 + 页缓存」。容器内 comfyui-idle-free 守护会在
+    # 队列空闲 COMFYUI_IDLE_FREE_SECONDS 秒后自动 /free 回收（默认开启），把遗留占用
+    # 清掉；但把上限压得比单条工作流自身需求还低（例如 H3 权重 ~37GB 对 24G 上限）
+    # 仍会换页颠簸 —— 那属于算力/内存配置问题，不是这里的开关能变的。
     deploy:
       resources:
         limits:

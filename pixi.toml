@@ -22,6 +22,10 @@ up = { cmd = "docker compose up -d", description = "启动 ComfyUI + H3 容器�
 up-build = { cmd = "docker compose up -d --build", description = "前台构建并启动（适合快速增量构建）" }
 down = { cmd = "docker compose down", description = "停止并移除容器" }
 restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyUI 容器" }
+# 立即卸载 ComfyUI 的常驻模型 + 清空节点缓存（等价 WebUI 的 Free model and node cache）。
+# 内存受限时容器内的 comfyui-idle-free 守护会空闲自动释放（.env.example 可调阈值/关闭），
+# 这条用于随时手动触发一次。
+free = { cmd = "docker exec comfyui-h3 /usr/local/bin/node /opt/ai-dock/bin/comfyui-idle-free.mjs --free-now", description = "立即卸载 ComfyUI 常驻模型并释放显存/内存" }
 logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
 # 修复既有容器：PathchSageAttentionKJ 报 ModuleNotFoundError: No module named 'sageattention'
 # 时，在运行中的容器里现场编译安装 SageAttention v2.2.0（无需重建镜像）

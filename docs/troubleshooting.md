@@ -27,6 +27,56 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 
 挂载目录不是以你自己的用户创建的：Docker 会以 root 创建不存在的 bind 源，容器内以 uid 1000 运行的 ComfyUI 读不到 / 写不进。先 `mkdir -p models output`（详见 [deployment.md](deployment.md#1-目录准备很重要)）。
 
+## ComfyUI 跑完任务后内存 / 显存不释放，后续任务卡死
+
+**现象**：任务跑完后 `docker stats` 的 MEM USAGE 居高不下、`nvidia-smi` 显存也不回落；连续跑几条不同工作流后，后面的任务长时间没进展，甚至容器里的进程被杀（OOM）。用 MCP 批量调用时尤其明显。
+
+**根因**：**这不是 MCP 泄漏，是 ComfyUI 的缓存设计 + 容器内存上限**。
+
+1. ComfyUI 跑完任务**不会释放**：模型留在显存（默认 smart memory「能留就留」），显存不够时也只是卸载到系统内存继续留着；节点中间结果走 RAM 压力缓存（默认阈值取系统内存的 active 10% / inactive 100%）；safetensors 默认 mmap 读进来的页缓存同样计入容器内存。官方唯一的释放口是 `POST /free {"unload_models":true,"free_memory":true}`（WebUI 的 **Free model and node cache** 按钮就是它）。
+2. 于是跨模型族连续调用会层层堆积（H3 权重 ~37GB → Qwen-Edit 9.2GB 主模型 + 4.7GB 文本编码器 → SDXL 2×6.9GB），而 `docker-compose.yml` 的 `memory` 上限（默认 24G）远低于本仓库推荐的「32GB 起 / 64GB 稳」，撞上限后只能靠换页与回收活着 —— 表现就是「后面的任务卡死」。
+3. 另一个放大器：ComfyUI 的动态显存会把主机内存**锁页**（pinned；检测到 cgroup 限制时预算是 `ram - 4GB`）。锁页内存内核既不能回收也不能换出，一撞上限就是 OOM kill —— 被杀的是 ComfyUI 就丢队列、是 MCP 进程就丢客户端会话，两种都表现为「卡死」。
+
+### 已内置处置：容器内 `comfyui-idle-free` 守护（默认开启）
+
+它在队列空闲（无 running / 无 pending）超过 `COMFYUI_IDLE_FREE_SECONDS` 秒（默认 60）后自动调一次 `/free`，把模型与缓存还回去；队列不空就不释放，所以**连续批量任务不受影响**。它也**不会打断正在跑的任务**：`/free` 只是给队列置 flag，由 ComfyUI 的 prompt worker 在循环里消费，正在执行的任务读不到它，最坏也只是「当前任务跑完才释放」。
+
+```bash
+pixi run free                                     # 手动立即释放一次（等价 Free model and node cache）
+docker exec -it comfyui-h3 supervisorctl status   # 应能看到 comfyui-idle-free RUNNING
+docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-idle-free.log
+```
+
+在 `.env` 里调（改完需 `docker compose up -d` 重建容器才生效）：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `COMFYUI_IDLE_FREE_ENABLE` | `true` | 关掉空闲自动释放设 `false` |
+| `COMFYUI_IDLE_FREE_SECONDS` | `60` | 空闲多久后释放（最小 5）。想优先「连续任务复用模型的加载速度」可调大，如 600 |
+| `COMFYUI_IDLE_FREE_POLL` | `3` | 轮询间隔秒数（一般不用改） |
+
+### 确认是哪一层占着（求助时带上这几条）
+
+```bash
+docker stats comfyui-h3 --no-stream                        # 容器 MEM USAGE 是否贴着上限且不回落
+docker inspect comfyui-h3 --format '{{.HostConfig.Memory}}' # 确认内存上限真的生效（24G = 25769803776）
+docker exec comfyui-h3 sh -c 'cat /sys/fs/cgroup/memory.current;
+  grep -E "^(anon|inactive_file|active_file|pinned)" /sys/fs/cgroup/memory.stat'
+docker logs comfyui-h3 2>&1 | grep -E "Total VRAM|total RAM|RAM pressure cache|pinned memory|OutOfMemory|Killed"
+nvidia-smi --query-gpu=memory.used --format=csv
+```
+
+`inactive_file` 大 = mmap 页缓存（可回收，属正常现象）；`anon` / `pinned` 大才是真正要治的常驻占用。
+
+### 空闲释放后仍然卡
+
+说明单条工作流本身就超过了上限，与「跑完不释放」无关：
+
+- **降常驻**：给 `COMFYUI_ARGS` 加 `--disable-pinned-memory`（不锁页，让内核可回收）或 `--fast-disk`（改为磁盘后备的 offload，适合 NVMe）；节点结果想再收紧可加 `--cache-ram 2 4`，极端情况 `--cache-none`。
+- **跨模型族的批量任务之间** `pixi run restart`，用重启换确定性（代价是下次要重新加载）。
+- **抬上限或拆容器**：把 `docker-compose.yml` 的 `memory` 提到 32G 起 / 64G 稳，或把不同模型族拆到不同时间窗跑。
+- 注：`COMFYUI_ARGS` 里的 `--lowvram` 在当前 ComfyUI master 上**已是空操作**（dynamic VRAM 默认开启时该参数被忽略），真正管这块的是上面几个参数。
+
 ## Qwen 修图：工作流报缺节点 / 输出不按指令改
 
 **现象 A**：打开 `qwen_image_edit_gguf*.json` 时节点框红、提示缺失节点（`UnetLoaderGGUF` / `CLIPLoaderGGUF`）。

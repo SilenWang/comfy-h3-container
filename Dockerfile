@@ -169,6 +169,22 @@ COPY docker/supervisor-comfyui-mcp.sh /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 
 # ---------------------------------------------------------------
+# 4b. 空闲自动释放：comfyui-idle-free（容器内 supervisord 托管，随容器启动）
+#     ComfyUI 跑完任务**不会**自己释放内存/显存：模型留在显存（smart memory 能留就留），
+#     显存不够时也只是卸载到系统内存继续留着；节点中间结果走 RAM 压力缓存；safetensors
+#     默认 mmap 读进来的页缓存同样计入容器 cgroup 内存。唯一的释放口是
+#     POST /free {"unload_models":true,"free_memory":true}。
+#     容器内存被限死时（docker-compose 的 memory 上限），跨模型族连续调用会把常驻占用
+#     越堆越高，后面的任务被换页/回收拖死甚至 OOM —— 该守护在队列空闲
+#     COMFYUI_IDLE_FREE_SECONDS 秒（默认 60）后自动调 /free 回收。
+#     细节与排查见 docs/troubleshooting.md；手动释放：`pixi run free`。
+#     Node 用上面第 4 节装好的官方 Node 22（零第三方依赖，只用全局 fetch）。
+# ---------------------------------------------------------------
+COPY docker/supervisor-comfyui-idle-free.conf /etc/supervisor/supervisord/conf.d/comfyui-idle-free.conf
+COPY docker/comfyui-idle-free.mjs /opt/ai-dock/bin/comfyui-idle-free.mjs
+RUN chmod +x /opt/ai-dock/bin/comfyui-idle-free.mjs
+
+# ---------------------------------------------------------------
 # 5. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录
 # ---------------------------------------------------------------
 COPY extra_model_paths.yaml /opt/ComfyUI/extra_model_paths.yaml
