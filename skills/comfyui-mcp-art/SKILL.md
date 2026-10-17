@@ -26,22 +26,42 @@ description: 用 comfy-h3 容器里的 ComfyUI（经 comfyui MCP 调用）把游
 - **画风只在作品内锁定**。这条链路不会把素材改成「别的作品的画风」；跨作品迁移画风要走风格 LoRA / USO，不在本技能范围。
 - **一张定妆图全项目复用**。同一个角色的所有出图都从同一张定妆图出发；换角色就换定妆图，不要每次从截图重抽。
 
-## 用 MCP 怎么调
+## MCP 调用骨架（实测跑通）
 
-连接配置用 `pixi run mcp-config` 打印（URL 与 token 由环境提供，**不要写进技能或脚本**）。工具名以服务端 `tools/list` 为准，这条流水线用到的是：
+连接用 `pixi run mcp-config` 打印（URL 与 token 由环境提供，**不要写进技能**）。全部经 comfyui MCP 完成，不需要自建转换脚本、也不需要直接打 ComfyUI 的 HTTP API——`get_workflow` 的 `api` 格式就是可提交的 payload（bypass 已解析，`_meta.mode` 标注）。
 
-| 步骤 | 工具 | 说明 |
-|---|---|---|
-| 找模板 | `get_workflow` `action:"list"` / `"get"` | 仓库 `workflows/` 已挂进 ComfyUI 工作流库 |
-| 读结构 | `get_workflow` `action:"analyze"` / `"strip"` | 先看懂节点再改；`strip` 能展开 bypass / 总线 |
-| 传图 | `upload_image` | 图 1 / 图 2 传到 ComfyUI 的 `input/` |
-| 校验 | `create_workflow` `action:"validate"` | 缺模型、断线、非法输出索引先在这里拦下 |
-| 提交 | `enqueue_workflow` `action:"enqueue"` | **只收 API 格式**；仓库里是 UI 格式，用 `scripts/ui_to_api.js` 转 |
-| 等结果 | `queue` `action:"status"`、`get_history` `action:"list"` | 失败用 `get_history` `action:"diagnose"` |
-| 看图 | `get_image` `action:"view"` | **先看 1 张再批量**；身份或构图不对就别跑 9 张 |
-| 释放显存 | `clear_vram` | 批量跑完释放；容器另有空闲自动释放 |
+```text
+1. get_workflow    {action:"get", filename:"qwen_image_edit_reference.json"}
+                   # 默认 format:"api"；返回末尾可能带 "Conversion warnings"（缺输入图/模型），先处理
+2. upload_image    {action:"image", source_path:"<跑 MCP 那台机器上的绝对路径>"}
+                   # → 返回 LoadImage 可用的文件名；已在 input/ 里的图可跳过
+3. 改返回的 JSON    # 返回体是「JSON + 可选 Conversion warnings」两段，取前面的 JSON 解析
+                   # 节点 id 与工作流里的数字一致：图 1=5、图 2=6、指令=10（多机位是 8）、KSampler.seed、SaveImage.filename_prefix
+4. create_workflow {action:"validate", workflow:<patched>}
+                   # 缺模型、断线、图片不在 input/ 都在这里报（会列出 valid options）
+5. enqueue_workflow{action:"enqueue", workflow:<patched>}    # → {prompt_id}
+                   # 注意：enqueue 不随机化 seed，要变的 seed 自己写
+6. queue           {action:"status", prompt_id:"…"}          # → status_str: success | error
+7. get_history     {action:"list", prompt_id:"…"}            # → 输出文件名，如 "sil382/xxx_00001_.png"
+8. get_image       {action:"get", filename:"sil382/xxx_00001_.png"}
+                   # 内联返回图片；同一台机器的 /tmp/comfyui-images/ 也会落一份
+9. clear_vram      {}                                        # 批量跑完释放
+```
 
-参数沿用工作流内置值：4 步 Lightning、CFG 1.0、euler + simple。RTX 3060 12GB 实测 **60–92 秒/张**（模型已缓存）。
+| 目的 | 工具与关键参数 |
+|---|---|
+| 找模板 / 读结构 | `get_workflow` `{action:"list"}`、`{action:"analyze", filename}`、`{action:"strip", path}` |
+| 传图 | `upload_image` `{action:"image", source_path}`；复用已有输出 `{action:"stage", filename}` |
+| 校验 | `create_workflow` `{action:"validate", workflow}` |
+| 单张提交 | `enqueue_workflow` `{action:"enqueue", workflow}` |
+| 批量（9 机位） | `batch` `{action:"submit", workflows:[9 份 patch 后的 workflow]}` → `{action:"wait", batch_id}` → `{action:"output", batch_id}` |
+| 等结果 | `queue` `{action:"status", prompt_id}`；失败诊断 `get_history` `{action:"diagnose", prompt_id}` |
+| 看图 | `get_image` `{action:"get", filename}`（按文件名）/ `{action:"list_outputs"}`（浏览）/ `{action:"view", asset_id}`（按资产 id） |
+| 存变体 | `save_workflow` `{action:"save", filename, workflow}` |
+
+`batch` 的 `sweep` 是**按输入名**打到所有同名节点（如 `prompt` 会同时写进正向与负向节点），机位这类要精确改单个节点的场景用 `workflows` 数组，每份单独 patch。
+
+参数沿用工作流内置值：4 步 Lightning、CFG 1.0、euler + simple。RTX 3060 12GB 实测 **59–92 秒/张**（模型已缓存）。
 
 ## 用哪个工作流
 
@@ -57,17 +77,9 @@ description: 用 comfy-h3 容器里的 ComfyUI（经 comfyui MCP 调用）把游
 - 角色（截图 → 提取补完 → 定妆 → 9 向）：读 [references/character-pipeline.md](references/character-pipeline.md)
 - 背景（截图 → 干净背景 → 多时段）：读 [references/background-pipeline.md](references/background-pipeline.md)
 
-## 脚本
+## 验证记录
 
-`scripts/ui_to_api.js` 把仓库里的 UI 版工作流 + 覆盖项转成 `enqueue_workflow` 能提交的 API JSON：
-
-```bash
-node scripts/ui_to_api.js ../../workflows/qwen_image_edit_reference.json overrides.json > prompt.json
-```
-
-- 覆盖项：`{"nodes":{"5":{"image":"shot.png"},"10":{"prompt":"…"}},"modes":{"17":0,"18":0}}`（`modes` 里 0 = 启用、4 = Bypass）
-- 控件名默认从 `COMFY_HOST`（默认 `http://127.0.0.1:8188`）的 `/object_info` 取；离线时用 `--object-info-file <json>`
-- 只输出 JSON，不发请求——提交仍然走 MCP
+2026-10-17 用 MCP 实跑一遍：`get_workflow` 取 `qwen_image_edit_multiangle` 的 api 格式 → 改 `图 1` / 机位词 / seed / 输出前缀 → `create_workflow validate` 通过 → `enqueue_workflow`（59 秒完成）→ `get_history` 拿到输出文件名 → `get_image` 内联取回图片。同一天 `validate` 也正确拦下了 `LoadImage` 里不存在的图片名（列出可用文件）。角色/背景的指令与参数来自 SIL-382 的实跑对照。
 
 ## 常见故障
 
@@ -78,5 +90,7 @@ node scripts/ui_to_api.js ../../workflows/qwen_image_edit_reference.json overrid
 | 人物变了 | 图 2 用了别的作品 / 别的角色 | 换同作品同角色的图 |
 | 背景、字幕被带进结果 | 图 2 是整张截图 | 图 2 裁到只含脸 / 机位 |
 | 输出尺寸和输入不一致 | `FluxKontextImageScale` 按固定尺寸表缩放 | 1920×1080 → 1392×752，后续抠像 / 缩放按输出尺寸对齐 |
-| 提交报 required input missing | UI 版 JSON 的字段名与当前 `/object_info` 不一致（如 `reference_latents_method`） | 先 `create_workflow` `action:"validate"`，或按 `/object_info` 核对后再提交 |
+| 提交报 required input missing | 手写 API JSON 的字段名与当前 `/object_info` 不一致（如 `reference_latents_method`） | 别手写：从 `get_workflow` 的 api 格式改值，再 `create_workflow` `action:"validate"` |
+| `validate` 报 `value_not_in_list` | 输入图不在 ComfyUI 的 `input/` | 先 `upload_image`（`action:"image"`），或 `action:"stage"` 复用已有输出 |
+| `get_image` 报缺 `asset_id` | 用了 `action:"view"` | 按文件名取图是 `action:"get"` + `filename` |
 | 多角度 LoRA 报错 / 画面糊 | GGUF 上叠 LoRA 属 experimental 路径 | 先把多角度 LoRA 的 `strength_model` 设 0 确认底座，再考虑换 Q4_K_S |

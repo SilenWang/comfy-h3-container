@@ -8,9 +8,9 @@
 
 目标：没有人物、没有姓名条 / 字幕 / 水印、透视和建筑物位置不动的整幅背景。
 
-1. **图 1** = 一张尽量少人物的关键帧（优先从仓库 `pixi run bg-candidates` 的候选里挑）。
+1. **图 1** = 一张尽量少人物的关键帧（候选帧的筛选走仓库既有流程，本技能只管出图）。
 2. **图 2** = 同地点、同画风的另一帧（可选；放一张更干净的更稳）。
-3. 有残留人物 / UI 时开 mask：把要重画的地方涂白，`Grow Mask`、`Set Latent Noise Mask` 取消 Bypass。
+3. 有残留人物 / UI 时开 mask：把要重画的地方设成透明（alpha=0），并按下文接线；接线方式见 [character-pipeline.md](character-pipeline.md) 第 1 步（api JSON 里补上 `Grow Mask` / `Set Latent Noise Mask` 两个节点）。
 4. 指令（按缺什么写，一次只改一类）：
 
 ```text
@@ -18,7 +18,7 @@
 补全被挡住的地面、墙面与家具；建筑物位置、透视与光影方向保持不变
 ```
 
-5. 验收走仓库同一套门槛：`pixi run check-backgrounds`（dialog / ocr / blue / watermark / figure 五项，任一命中即不合格）。
+5. 出图后先 `get_image` `{action:"get", filename}` 看一眼，再按仓库既有的背景验收流程过门槛。
 
 ## 2. 同一地点的多时段 / 天气
 
@@ -42,8 +42,7 @@
 
 ## 3. 输出与归档
 
-- 输出落在 `output/qwen_edit/…`，按 `bg_<地点>_<时段>.png` 命名。
-- 进 `webgal/game/background/` 前先过 `pixi run check-backgrounds`，再按仓库的 S3 流程归档。
+- 输出落在 ComfyUI 的 `output/qwen_edit/…`（`SaveImage.filename_prefix` 可改），按 `bg_<地点>_<时段>.png` 命名。
 - 需要固定尺寸时在外部按目标尺寸缩放；ComfyUI 侧输出尺寸由 `FluxKontextImageScale` 决定（1920×1080 → 1392×752）。
 
 ## 常见问题

@@ -1,16 +1,33 @@
 # 角色：截图 → 提取 + 补完 → 定妆 → 9 向设定表
 
-全部在 `qwen_image_edit_reference.json`（第 1、2 步）和 `qwen_image_edit_multiangle.json`（第 3 步）上做，不改工作流文件本身，只换输入图、指令、种子和输出前缀。
+全部经 comfyui MCP 做（调用骨架见 `SKILL.md`）：`get_workflow` 取 api 格式 → 改节点输入 → `upload_image` → `create_workflow validate` → `enqueue_workflow` / `batch`。不改工作流文件本身，只换输入图、指令、种子和输出前缀。
 
 ## 第 1 步：提取 + 补完（mask 分支打开）
 
 源截图通常带姓名条、字幕、平台水印，角色也被这些 UI 压住一部分。这一步要一次把 UI 去掉、把被压住的身体补回来，其余像素不动。
 
-1. `upload_image` 传两张图：
+1. `upload_image` `{action:"image", source_path}` 传两张图（路径必须是跑 MCP 的那台机器能读到的）：
    - **图 1** = 源截图
    - **图 2** = **同一个角色的另一张完整截图**（视频里同一角色有成百上千帧，挑一张没被 UI 挡住的）
-2. 给图 1 画 mask：`MaskEditor` 里把姓名条、字幕、水印涂白保存（写进 PNG 的 alpha 通道）。
+2. 给图 1 画 mask：mask 就是 PNG 的 **alpha 通道为 0** 的区域。WebUI 里用 `MaskEditor` 涂白保存；由脚本生成时直接把要重绘的区域设成透明，例如：
+
+```bash
+ffmpeg -i shot.png -vf "format=rgba,geq=a='if(between(X,760,1330)*between(Y,820,1080),0,255)'" base_repair.png
+```
+
+   再把这个 PNG 传上去当图 1。
 3. 把 `Grow Mask`（expand 16）和 `Set Latent Noise Mask` 的 **Bypass 取消**。
+
+   MCP 路径下没有右键菜单：这两个节点在原工作流里是 Bypass 的，`get_workflow` 的 api 格式里**根本不出现**，要手工接回来（下面四行已验证 `validate` 通过；API 格式的节点 id 与 UI 一致）：
+
+```js
+w["17"] = { class_type: "GrowMask", inputs: { mask: ["5", 1], expand: 16, tapered_corners: true } };
+w["18"] = { class_type: "SetLatentNoiseMask", inputs: { samples: ["9", 0], mask: ["17", 0] } };
+w["19"].inputs.latent_image = ["18", 0];   // 原本直连 "9"（VAEEncode）
+// 然后 create_workflow {action:"validate", workflow:w} 再提交
+```
+
+   更省事的做法：在 WebUI 里把这两个节点取消 Bypass、`save_workflow` 存成一份「补全」变体，之后每次用 `get_workflow` 取它。
 4. 指令：
 
 ```text
@@ -45,7 +62,15 @@
 ## 第 3 步：9 向设定表（`qwen_image_edit_multiangle.json`）
 
 1. **图 1** = 定妆图；`图 2` 不用。
-2. 只换机位指令，其它词与种子不动，跑 9 次：
+2. 只换机位指令，其它词与种子不动。9 张用一次 `batch` 提交（`sweep` 会同时打进正向/负向节点，所以用 `workflows` 数组，每份单独 patch）：
+
+```text
+batch {action:"submit", workflows:[wf1, wf2, … wf9]}   # 每份把节点 8 的 prompt 换成下面对应一条
+batch {action:"wait", batch_id:"…"}                     # 等全部跑完
+batch {action:"output", batch_id:"…"}                   # 各任务输出文件名 → get_image 取图
+```
+
+9 条机位词：
 
 ```text
 <sks> front view eye-level shot close-up
