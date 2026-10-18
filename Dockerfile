@@ -171,18 +171,23 @@ RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 # ---------------------------------------------------------------
 # 4b. 空闲自动释放：comfyui-idle-free（容器内 supervisord 托管，随容器启动）
 #     ComfyUI 跑完任务**不会**自己释放内存/显存：模型留在显存（smart memory 能留就留），
-#     显存不够时也只是卸载到系统内存继续留着；节点中间结果走 RAM 压力缓存；safetensors
-#     默认 mmap 读进来的页缓存同样计入容器 cgroup 内存。唯一的释放口是
-#     POST /free {"unload_models":true,"free_memory":true}。
-#     容器内存被限死时（docker-compose 的 memory 上限），跨模型族连续调用会把常驻占用
-#     越堆越高，后面的任务被换页/回收拖死甚至 OOM —— 该守护在队列空闲
-#     COMFYUI_IDLE_FREE_SECONDS 秒（默认 60）后自动调 /free 回收。
+#     显存不够时也只是卸载到系统内存继续留着；节点中间结果走 RAM 压力缓存；safetensors /
+#     GGUF 读盘产生的页缓存同样计入容器 cgroup 内存。
+#     POST /free 只卸载模型对象 / 清节点缓存 / 清 CUDA cache，**不会丢弃页缓存** ——
+#     实测 /free 后显存立即回收，`docker stats` 的内存却几乎不变。
+#     因此该守护在队列空闲 COMFYUI_IDLE_FREE_SECONDS 秒（默认 60）后：
+#       1) 记录 cgroup 内存明细；2) POST /free；3) 再用 comfyui-drop-cache.py 对模型
+#       文件调 fadvise(DONTNEED) 丢弃页缓存；4) 长空闲（默认 900s）后若匿名/锁页内存
+#       仍高，重启 ComfyUI 回收进程堆 —— 实测 /free 后 anon 17GB 不降，重启才回落。
 #     细节与排查见 docs/troubleshooting.md；手动释放：`pixi run free`。
-#     Node 用上面第 4 节装好的官方 Node 22（零第三方依赖，只用全局 fetch）。
+#     Node 用上面第 4 节装好的官方 Node 22（零第三方依赖，只用全局 fetch）；
+#     页缓存脚本用镜像自带的 ComfyUI venv Python，不额外装依赖。
+#     运行中的旧容器可 `pixi run mem-install` 热更新（无需整镜像重建）。
 # ---------------------------------------------------------------
 COPY docker/supervisor-comfyui-idle-free.conf /etc/supervisor/supervisord/conf.d/comfyui-idle-free.conf
 COPY docker/comfyui-idle-free.mjs /opt/ai-dock/bin/comfyui-idle-free.mjs
-RUN chmod +x /opt/ai-dock/bin/comfyui-idle-free.mjs
+COPY docker/comfyui-drop-cache.py /opt/ai-dock/bin/comfyui-drop-cache.py
+RUN chmod +x /opt/ai-dock/bin/comfyui-idle-free.mjs /opt/ai-dock/bin/comfyui-drop-cache.py
 
 # ---------------------------------------------------------------
 # 5. 模型路径映射：挂载卷 /workspace/models -> ComfyUI 各模型目录

@@ -25,7 +25,11 @@ restart = { cmd = "docker compose restart comfyui", description = "重启 ComfyU
 # 立即卸载 ComfyUI 的常驻模型 + 清空节点缓存（等价 WebUI 的 Free model and node cache）。
 # 内存受限时容器内的 comfyui-idle-free 守护会空闲自动释放（.env.example 可调阈值/关闭），
 # 这条用于随时手动触发一次。
-free = { cmd = "docker exec comfyui-h3 /usr/local/bin/node /opt/ai-dock/bin/comfyui-idle-free.mjs --free-now", description = "立即卸载 ComfyUI 常驻模型并释放显存/内存" }
+free = { cmd = "docker exec -u root comfyui-h3 /usr/local/bin/node /opt/ai-dock/bin/comfyui-idle-free.mjs --free-now", description = "立即卸载 ComfyUI 常驻模型、释放显存并丢弃模型页缓存" }
+# 内存排查：cgroup 明细（anon/file/inactive_file/pinned）+ 显存 + 守护日志。
+mem-status = { cmd = "bash scripts/mem_status.sh {{ container }}", args = [{ arg = "container", default = "comfyui-h3" }], description = "查看 ComfyUI 容器的 cgroup 内存明细、显存、idle-free 状态与日志" }
+# 热更新：把最新的 idle-free + 页缓存脚本复制进运行中的容器并重启守护，无需重建镜像。
+mem-install = { cmd = "bash scripts/mem_install.sh {{ container }}", args = [{ arg = "container", default = "comfyui-h3" }], description = "把最新 idle-free 守护与页缓存脚本热更新进运行中的容器（不重建镜像）" }
 logs = { cmd = "docker compose logs -f comfyui", description = "跟踪容器日志" }
 # 修复既有容器：PathchSageAttentionKJ 报 ModuleNotFoundError: No module named 'sageattention'
 # 时，在运行中的容器里现场编译安装 SageAttention v2.2.0（无需重建镜像）

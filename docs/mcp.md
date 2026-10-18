@@ -84,11 +84,12 @@ docker run --rm --add-host host.docker.internal:host-gateway <你的镜像> \
 ## 查看 / 管理容器内服务（supervisor）
 
 容器内由 supervisord 托管两个服务：`comfyui-mcp`（上文的 MCP，随容器启动）与
-`comfyui-idle-free`（队列空闲后自动 `/free` 释放常驻模型与缓存，见
-[troubleshooting.md](troubleshooting.md#comfyui-跑完任务后内存--显存不释放后续任务卡死)）。
+`comfyui-idle-free`（队列空闲后自动 `/free` 释放常驻模型与缓存，并丢弃模型文件页缓存，
+见 [troubleshooting.md](troubleshooting.md#comfyui-跑完任务后内存--显存不释放后续任务卡死)）。
 
 ```bash
 pixi run logs                                        # 跟踪容器日志（comfyui + caddy + comfyui-mcp 汇总）
+pixi run mem-status                                  # cgroup 内存明细 + 显存 + idle-free 状态/日志
 docker exec -it comfyui-h3 supervisorctl status
 docker exec -it comfyui-h3 supervisorctl restart comfyui-mcp
 docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-mcp.log
