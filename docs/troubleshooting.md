@@ -39,13 +39,29 @@ KJNodes 是在节点执行时才 import，装好后**不用重启 ComfyUI**，�
 
 ### 已内置处置：容器内 `comfyui-idle-free` 守护（默认开启）
 
-它在队列空闲（无 running / 无 pending）超过 `COMFYUI_IDLE_FREE_SECONDS` 秒（默认 60）后自动调一次 `/free`，把模型与缓存还回去；队列不空就不释放，所以**连续批量任务不受影响**。它也**不会打断正在跑的任务**：`/free` 只是给队列置 flag，由 ComfyUI 的 prompt worker 在循环里消费，正在执行的任务读不到它，最坏也只是「当前任务跑完才释放」。
+它在队列空闲（无 running / 无 pending）超过 `COMFYUI_IDLE_FREE_SECONDS` 秒（默认 60）后按顺序做四件事：
+
+1. 记录 cgroup 内存明细（working set / anon / file / inactive_file / pinned）；
+2. `POST /free {"unload_models":true,"free_memory":true}` 卸载模型、清节点缓存、清显存；
+3. 若页缓存仍高于 `COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB`，对模型文件调 `posix_fadvise(DONTNEED)` **丢弃页缓存**；
+4. （可选）长空闲后若 anon/pinned 仍高，`supervisorctl restart comfyui` 重启进程回收匿名/锁页内存（默认关闭）。
+
+> **为什么第 3 步是必须的**：`/free` 不会动文件页缓存。实测在一个已空闲 11 小时的容器里手动 `/free`：
+> 显存从 7.3GB 占用降到 0.5GB（`vram_free` 5.17GB → 11.94GB），但 `memory.stat` 的 `file` 一点没降，
+> `docker stats` 的 MEM USAGE 也就「不释放」。本仓库的 Qwen-Edit 链路（9.22GB 主模型 + 4.68GB
+> 文本编码器 + VAE/LoRA）读盘产生的页缓存恰好 ~15GB，和观测到的常驻占用吻合。这些页是干净的、
+> 可回收的，但内核在没有内存压力时不会主动丢；24G 硬上限下必须显式丢。
+
+队列不空就不释放，所以**连续批量任务不受影响**；也**不会打断正在跑的任务**：`/free` 只是给队列置 flag，由 ComfyUI 的 prompt worker 在循环里消费，正在执行的任务读不到它，最坏也只是「当前任务跑完才释放」。
 
 ```bash
-pixi run free                                     # 手动立即释放一次（等价 Free model and node cache）
-docker exec -it comfyui-h3 supervisorctl status   # 应能看到 comfyui-idle-free RUNNING
-docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-idle-free.log
+pixi run mem-status                               # 看 cgroup 明细 + 显存 + 守护状态/日志（排查先跑这个）
+pixi run free                                     # 手动立即释放：/free + 丢弃页缓存
+docker exec -u root comfyui-h3 supervisorctl status comfyui-idle-free   # 应为 RUNNING
+docker exec -u root comfyui-h3 tail -f /var/log/supervisor/comfyui-idle-free.log
 ```
+
+**已经部署的旧容器不需要重建镜像**：`pixi run mem-install` 会把最新守护与页缓存脚本 `docker cp` 进容器并重启该守护（ComfyUI 本体不动）。重建镜像则用 `pixi run build && pixi run up`。
 
 在 `.env` 里调（改完需 `docker compose up -d` 重建容器才生效）：
 
@@ -54,19 +70,31 @@ docker exec -it comfyui-h3 tail -f /var/log/supervisor/comfyui-idle-free.log
 | `COMFYUI_IDLE_FREE_ENABLE` | `true` | 关掉空闲自动释放设 `false` |
 | `COMFYUI_IDLE_FREE_SECONDS` | `60` | 空闲多久后释放（最小 5）。想优先「连续任务复用模型的加载速度」可调大，如 600 |
 | `COMFYUI_IDLE_FREE_POLL` | `3` | 轮询间隔秒数（一般不用改） |
+| `COMFYUI_IDLE_FREE_DROP_FILE_CACHE` | `true` | 是否丢弃模型文件页缓存（下一次加载会重新读盘） |
+| `COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB` | `512` | 页缓存高于该值才丢弃 |
+| `COMFYUI_IDLE_FREE_RESTART_SECONDS` | `0` | 空闲释放后再空闲 N 秒重启 ComfyUI（回收 anon/pinned，0=关闭） |
+| `COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB` | `4096` | 重启阈值：anon+pinned 高于该值才重启 |
 
 ### 确认是哪一层占着（求助时带上这几条）
 
 ```bash
+pixi run mem-status                                        # 一条命令拿到所有关键数据
 docker stats comfyui-h3 --no-stream                        # 容器 MEM USAGE 是否贴着上限且不回落
 docker inspect comfyui-h3 --format '{{.HostConfig.Memory}}' # 确认内存上限真的生效（24G = 25769803776）
-docker exec comfyui-h3 sh -c 'cat /sys/fs/cgroup/memory.current;
-  grep -E "^(anon|inactive_file|active_file|pinned)" /sys/fs/cgroup/memory.stat'
-docker logs comfyui-h3 2>&1 | grep -E "Total VRAM|total RAM|RAM pressure cache|pinned memory|OutOfMemory|Killed"
+docker exec -u root comfyui-h3 sh -c 'cat /sys/fs/cgroup/memory.current;
+  grep -E "^(anon|file|active_file|inactive_file|pinned|slab)" /sys/fs/cgroup/memory.stat'
 nvidia-smi --query-gpu=memory.used --format=csv
 ```
 
-`inactive_file` 大 = mmap 页缓存（可回收，属正常现象）；`anon` / `pinned` 大才是真正要治的常驻占用。
+怎么读这些数：
+
+- `file` / `active_file` 大：模型页缓存，**可回收**，但不会自己消失 —— 这正是守护第 3 步要丢的东西。
+  `pixi run free` 后 `file` 应明显下降（日志里会打印 `file 页缓存 X → Y`）。
+- `inactive_file` 大：已被内核标记为不活跃的页缓存，ComfyUI 自己也把它从可用内存里排除，属正常。
+- `anon` / `pinned` 大且 `/free` 后不降：真正的常驻占用（锁页内存内核不能回收），需要
+  `--disable-pinned-memory` / `--fast-disk` 或开启 `COMFYUI_IDLE_FREE_RESTART_SECONDS`。
+- 释放日志里出现「跳过页缓存回收：找不到 /opt/ai-dock/bin/comfyui-drop-cache.py」= 容器还是旧镜像，
+  跑 `pixi run mem-install` 或重建镜像。
 
 ### 空闲释放后仍然卡
 

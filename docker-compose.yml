@@ -60,8 +60,18 @@ services:
       # 被换页拖死（详见 docs/troubleshooting.md）。该守护在队列空闲
       # COMFYUI_IDLE_FREE_SECONDS 秒后自动 POST /free 回收；连续批量任务不受影响
       # （队列不空就不释放）。想优先「连续任务的模型复用速度」可把秒数调大，如 600。
+      #
+      # ⚠️ /free 只释放显存与模型对象，不动模型文件的页缓存（docker stats 里的大头）。
+      # 所以守护默认还会调 posix_fadvise(DONTNEED) 丢弃模型页缓存，让 cgroup 内存真正下降；
+      # 下一次加载会重新读盘（NVMe 上多几秒）。
       COMFYUI_IDLE_FREE_ENABLE: ${COMFYUI_IDLE_FREE_ENABLE:-true}
       COMFYUI_IDLE_FREE_SECONDS: ${COMFYUI_IDLE_FREE_SECONDS:-60}
+      COMFYUI_IDLE_FREE_DROP_FILE_CACHE: ${COMFYUI_IDLE_FREE_DROP_FILE_CACHE:-true}
+      COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB: ${COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB:-512}
+      # 兜底：长时间空闲后若匿名/锁页内存仍高，重启 ComfyUI 进程（0 = 关闭）。
+      # 页缓存一般靠上面的 fadvise 就够；只有 anon/pinned 异常时才需要开这个。
+      COMFYUI_IDLE_FREE_RESTART_SECONDS: ${COMFYUI_IDLE_FREE_RESTART_SECONDS:-0}
+      COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB: ${COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB:-4096}
     volumes:
       # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
       # （绝对路径或相对本文件），便于多项目共用同一份模型、避免重复下载：

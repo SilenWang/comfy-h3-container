@@ -17,7 +17,7 @@
 - Turbo 4 步 LoRA 加速（实测提速 ~4.4×）
 - **SageAttention 注意力加速**：两个 workflow 已内置 `PathchSageAttentionKJ` 节点（Ampere/Ada 约 1.3–2×，不改生成结果）
 - **文本编码器显式卸载**：内置 `H3EvictTextEncoder`，编码后立即释放 15.7GB 的 Qwen3-VL，避免采样阶段反复经 PCIe 换入换出
-- **空闲自动释放内存**：ComfyUI 跑完任务不会自己释放模型/缓存，容器内存受限时占用会越堆越高、把后续任务拖死。容器内 `comfyui-idle-free` 守护在队列空闲 60 秒（可调 / 可关）后自动卸载常驻模型并清空节点缓存，`pixi run free` 可随时手动触发（原理与排查见 [troubleshooting.md](docs/troubleshooting.md#comfyui-跑完任务后内存--显存不释放后续任务卡死)）
+- **空闲自动释放内存**：ComfyUI 跑完任务不会自己释放模型/缓存，容器内存受限时占用会越堆越高、把后续任务拖死。容器内 `comfyui-idle-free` 守护在队列空闲 60 秒（可调 / 可关）后自动卸载常驻模型、清空节点缓存，并丢弃模型文件的页缓存（`/free` 不动页缓存，而它正是 `docker stats` 里的大头）；`pixi run free` 可随时手动触发，`pixi run mem-status` 看内存明细（原理与排查见 [troubleshooting.md](docs/troubleshooting.md#comfyui-跑完任务后内存--显存不释放后续任务卡死)）
 - WebUI + REST API（ComfyUI 原生）
 - 内置 [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp)：让 Agent **直接搭建 / 编辑 / 校验工作流**；作为容器内服务由 supervisord 托管（Streamable HTTP，宿主 9100），日志与 ComfyUI / caddy 一起进 `docker logs`
 - **二次元生图（galgame 素材）**：内置 3 个 SDXL 动漫底模工作流 —— 场景图（背景）、9 向人物设定表（单图 3×3）、9 向人物分向单图（同 seed 一次出 9 张），配套 `pixi run models image` 一键下底模，全部是 ComfyUI 原生节点、**不用重建镜像**
