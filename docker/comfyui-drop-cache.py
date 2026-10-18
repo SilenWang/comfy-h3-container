@@ -24,7 +24,9 @@
     COMFYUI_CGROUP_DIR          cgroup v2 目录，默认 /sys/fs/cgroup（用于打印前后对比）
 
 输出（stdout 一行 JSON，便于 Node 守护解析/记录）：
-    {"files": N, "bytes": M, "failed": K, "file_cache_before": X, "file_cache_after": Y}
+    {"files": N, "bytes": M, "failed": K, "file_cache_before": X, "file_cache_after": Y, "dropped_bytes": D}
+    files/bytes 是**扫描到**的模型文件数量与总大小；dropped_bytes 才是本次实际丢掉的页缓存
+    （file_cache_before - file_cache_after），可能远小于扫描总量。
 """
 
 import json
@@ -115,6 +117,9 @@ def main():
         else:
             failed += 1
     after = read_file_cache_bytes()
+    dropped = None
+    if before is not None and after is not None:
+        dropped = max(0, before - after)
 
     print(
         json.dumps(
@@ -124,6 +129,7 @@ def main():
                 "failed": failed,
                 "file_cache_before": before,
                 "file_cache_after": after,
+                "dropped_bytes": dropped,
             }
         )
     )

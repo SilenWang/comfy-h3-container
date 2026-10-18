@@ -39,7 +39,7 @@
 //   COMFYUI_IDLE_FREE_SETTLE_MS            /free 后等待多久再读内存明细，默认 2000
 //   COMFYUI_IDLE_FREE_DROP_FILE_CACHE      是否丢弃模型文件页缓存，默认 true
 //   COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB    页缓存高于该值才丢弃（MB），默认 512
-//   COMFYUI_IDLE_FREE_RESTART_SECONDS      空闲释放后再空闲多少秒重启 ComfyUI；0=关闭（默认）
+//   COMFYUI_IDLE_FREE_RESTART_SECONDS      空闲释放后再空闲多少秒重启 ComfyUI；默认 900，0=关闭
 //   COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB  重启阈值：anon+pinned 高于该值才重启（MB），默认 4096
 //   COMFYUI_MODEL_DIRS                     模型目录（冒号分隔），默认 /workspace/models:/opt/ComfyUI/models
 //   COMFYUI_PYTHON                         跑页缓存脚本的 Python，默认 /opt/environments/python/comfyui/bin/python
@@ -69,7 +69,7 @@ const SETTLE_MS = clampInt(process.env.COMFYUI_IDLE_FREE_SETTLE_MS, 2000, 0, 600
 const DROP_FILE_CACHE = !/^(0|false|no|off)$/i.test(process.env.COMFYUI_IDLE_FREE_DROP_FILE_CACHE ?? "true");
 const FILE_CACHE_MIN_BYTES =
   clampInt(process.env.COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB, 512, 0, 1024 * 1024) * 1024 * 1024;
-const RESTART_SECONDS = clampInt(process.env.COMFYUI_IDLE_FREE_RESTART_SECONDS, 0, 0, 7 * 86400);
+const RESTART_SECONDS = clampInt(process.env.COMFYUI_IDLE_FREE_RESTART_SECONDS, 900, 0, 7 * 86400);
 const RESTART_MS = RESTART_SECONDS * 1000;
 const RESTART_MIN_ANON_BYTES =
   clampInt(process.env.COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB, 4096, 0, 1024 * 1024) * 1024 * 1024;
@@ -209,10 +209,16 @@ function dropFileCache(reason) {
   }
   try {
     const out = JSON.parse((res.stdout || "").trim().split("\n").pop());
+    const dropped =
+      out.dropped_bytes ??
+      (out.file_cache_before !== null && out.file_cache_after !== null
+        ? Math.max(0, out.file_cache_before - out.file_cache_after)
+        : null);
     log(
-      `已丢弃模型文件页缓存（${reason}）：${out.files} 个文件、${gib(out.bytes)}，` +
-        `耗时 ${Date.now() - started}ms，file 页缓存 ${gib(out.file_cache_before)} → ${gib(out.file_cache_after)}` +
-        `${out.failed ? `（${out.failed} 个跳过）` : ""}`
+      `模型页缓存回收完成（${reason}）：扫描 ${out.files} 个权重文件（共 ${gib(out.bytes)}），` +
+        `耗时 ${Date.now() - started}ms；file 页缓存 ${gib(out.file_cache_before)} → ${gib(out.file_cache_after)}` +
+        `${dropped !== null ? `（实际丢弃 ${gib(dropped)}）` : ""}` +
+        `${out.failed ? `；${out.failed} 个跳过` : ""}`
     );
     return out;
   } catch {

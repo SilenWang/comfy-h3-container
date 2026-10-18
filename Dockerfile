@@ -177,9 +177,8 @@ RUN chmod +x /opt/ai-dock/bin/supervisor-comfyui-mcp.sh
 #     实测 /free 后显存立即回收，`docker stats` 的内存却几乎不变。
 #     因此该守护在队列空闲 COMFYUI_IDLE_FREE_SECONDS 秒（默认 60）后：
 #       1) 记录 cgroup 内存明细；2) POST /free；3) 再用 comfyui-drop-cache.py 对模型
-#       文件调 fadvise(DONTNEED) 丢弃页缓存；4) （可选）长空闲后重启 ComfyUI 回收
-#       匿名/锁页内存。容器内存被限死时（docker-compose 的 24G）这是唯一能让
-#       「MEM USAGE 真正降下来」的服务器层方案。
+#       文件调 fadvise(DONTNEED) 丢弃页缓存；4) 长空闲（默认 900s）后若匿名/锁页内存
+#       仍高，重启 ComfyUI 回收进程堆 —— 实测 /free 后 anon 17GB 不降，重启才回落。
 #     细节与排查见 docs/troubleshooting.md；手动释放：`pixi run free`。
 #     Node 用上面第 4 节装好的官方 Node 22（零第三方依赖，只用全局 fetch）；
 #     页缓存脚本用镜像自带的 ComfyUI venv Python，不额外装依赖。

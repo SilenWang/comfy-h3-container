@@ -68,9 +68,10 @@ services:
       COMFYUI_IDLE_FREE_SECONDS: ${COMFYUI_IDLE_FREE_SECONDS:-60}
       COMFYUI_IDLE_FREE_DROP_FILE_CACHE: ${COMFYUI_IDLE_FREE_DROP_FILE_CACHE:-true}
       COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB: ${COMFYUI_IDLE_FREE_FILE_CACHE_MIN_MB:-512}
-      # 兜底：长时间空闲后若匿名/锁页内存仍高，重启 ComfyUI 进程（0 = 关闭）。
-      # 页缓存一般靠上面的 fadvise 就够；只有 anon/pinned 异常时才需要开这个。
-      COMFYUI_IDLE_FREE_RESTART_SECONDS: ${COMFYUI_IDLE_FREE_RESTART_SECONDS:-0}
+      # 兜底（默认 900 秒 = 15 分钟）：长时间空闲后若匿名/锁页内存仍高，重启 ComfyUI 进程。
+      # 实测这个兜底才是让「/free 后 anon 17GB 不降」回落的关键：重启后 anon 18.21GB → 1.26GB。
+      # 只在 anon+pinned 高于 COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB 时触发；0 = 关闭。
+      COMFYUI_IDLE_FREE_RESTART_SECONDS: ${COMFYUI_IDLE_FREE_RESTART_SECONDS:-900}
       COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB: ${COMFYUI_IDLE_FREE_RESTART_MIN_ANON_MB:-4096}
     volumes:
       # 模型目录：默认仓库内 ./models。可用 .env 的 MODELS_DIR 指向外部目录
